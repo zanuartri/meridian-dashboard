@@ -254,13 +254,15 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
   .stat-sub{font-size:9px}
   .term-head{padding:10px 12px;flex-wrap:wrap;gap:8px}
   .term-title h2{font-size:11px}
-  .term-pills{flex-wrap:wrap;gap:4px}
-  .term-pill{font-size:9px;padding:3px 6px}
+  .term-pills{flex-wrap:nowrap;gap:4px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .term-pills::-webkit-scrollbar{display:none}
+  .term-pill{font-size:9px;padding:3px 6px;white-space:nowrap;flex-shrink:0}
   .chart-grid{grid-template-columns:1fr}
   .chart-grid .chart-box:nth-child(3){display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .chart-wrap{height:160px}
   .bottom-grid{grid-template-columns:1fr}
   .settings-grid{grid-template-columns:1fr}
+  .settings-grid .cfg-box:nth-child(4),.settings-grid .cfg-box:nth-child(5){grid-column:auto}
   .learn-grid{grid-template-columns:1fr}
   .pos-grid{grid-template-columns:1fr}
   .metrics{grid-template-columns:repeat(2,1fr)}
@@ -271,6 +273,9 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
   .pg{padding:8px 12px;flex-wrap:wrap;gap:6px}
   .tbl-scroll table{min-width:500px}
   .tbl-scroll th,.tbl-scroll td{padding:6px 10px;font-size:11px}
+  .cal-pos-item{flex-direction:column;align-items:flex-start;gap:8px}
+  .cal-pos-right{text-align:left}
+  .cal-positions h3{flex-direction:column;gap:4px}
 }
 
 @media(max-width:480px){
@@ -278,14 +283,16 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
   .stats{grid-template-columns:repeat(2,1fr)}
   .stat-v{font-size:14px}
   .metrics{grid-template-columns:1fr}
-  .term-pills{display:none}
   .chart-grid .chart-box:nth-child(3){grid-template-columns:1fr}
   .pos-card{font-size:11px}
   .pos-name{font-size:13px}
   .pos-row{font-size:11px}
   .pos-actions{flex-wrap:wrap}
+  .pos-btn{flex:none;width:calc(50% - 2px)}
   .trade-item{flex-direction:column;align-items:flex-start;gap:4px}
   .trade-pnl{text-align:left}
+  .cal-pos-meta{word-break:break-word}
+  .cal-pos-item{padding:8px 10px}
 }
 </style>
 </head>
