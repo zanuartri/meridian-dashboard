@@ -764,7 +764,7 @@ function renderCalendar(){
       const posClass=pnl>0.001?'profit':pnl<-0.001?'loss':'no-activity';
       cls+=' '+posClass;
       const pnlStr=pnl!==0?usd(pnl):'—';
-      h+=`<div class="${cls}" data-date="${dateStr}" title="${dateStr}: ${usd(pnl)} (${dayData.trades}T)"><div class="cal-num">${d}</div><div class="cal-pnl">${pnlStr}</div>${dayData.trades?`<div class="cal-trades">${dayData.trades}T</div>`:''}</div>`;
+      h+=`<div class="${cls}" data-date="${dateStr}" title="${dateStr}: ${usd(pnl)} (${dayData.trades} positions)"><div class="cal-num">${d}</div><div class="cal-pnl">${pnlStr}</div>${dayData.trades?`<div class="cal-trades">${dayData.trades} positions</div>`:''}</div>`;
     }
   }
   $('#calGrid').innerHTML=h;
