@@ -115,7 +115,6 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
 .cal-day .cal-num{font-size:13px;font-weight:600;color:var(--t2);margin-bottom:4px}
 .cal-day .cal-pnl{font-size:14px;font-weight:700}
 .cal-day .cal-trades{font-size:11px;color:var(--t4);margin-top:3px}
-.cal-day .cal-pos{font-size:11px;color:var(--blue);margin-top:2px}
 .cal-day.no-activity{background:var(--bg3)}
 .cal-day.profit{background:rgba(0,230,118,.1);border-color:rgba(0,230,118,.2)}
 .cal-day.profit .cal-pnl{color:var(--grn)}
@@ -139,7 +138,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
 .cal-pos-empty{font-family:var(--mono);font-size:11px;color:var(--t4);padding:16px;text-align:center;border:1px dashed var(--border);border-radius:var(--r)}
 
 @media(max-width:900px){.cal-day{min-height:56px}.cal-num{font-size:10px}.cal-pnl{font-size:9px}}
-@media(max-width:480px){.cal-grid{gap:2px}.cal-day{min-height:48px}.cal-num{font-size:9px}.cal-pnl{font-size:8px}.cal-trades,.cal-pos{display:none}.cal-legend{gap:10px;font-size:9px}}
+@media(max-width:480px){.cal-grid{gap:2px}.cal-day{min-height:48px}.cal-num{font-size:9px}.cal-pnl{font-size:8px}.cal-trades{display:none}.cal-legend{gap:10px;font-size:9px}}
 
 /* ═══ SETTINGS GRID ═══ */
 .settings-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
@@ -765,7 +764,7 @@ function renderCalendar(){
       const posClass=pnl>0.001?'profit':pnl<-0.001?'loss':'no-activity';
       cls+=' '+posClass;
       const pnlStr=pnl!==0?usd(pnl):'—';
-      h+=`<div class="${cls}" data-date="${dateStr}" title="${dateStr}: ${usd(pnl)} (${dayData.trades}T)"><div class="cal-num">${d}</div><div class="cal-pnl">${pnlStr}</div>${dayData.trades?`<div class="cal-trades">${dayData.trades}T</div>`:''}${dayData.positions?`<div class="cal-pos">${dayData.positions}P</div>`:''}</div>`;
+      h+=`<div class="${cls}" data-date="${dateStr}" title="${dateStr}: ${usd(pnl)} (${dayData.trades}T)"><div class="cal-num">${d}</div><div class="cal-pnl">${pnlStr}</div>${dayData.trades?`<div class="cal-trades">${dayData.trades}T</div>`:''}</div>`;
     }
   }
   $('#calGrid').innerHTML=h;
