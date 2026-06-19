@@ -103,22 +103,24 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
 .alloc-legend{display:flex;flex-wrap:wrap;gap:8px;font-family:var(--mono);font-size:10px;color:var(--t3)}
 .alloc-legend span{display:flex;align-items:center;gap:4px}
 .alloc-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+
 /* ═══ CALENDAR ═══ */
-.cal-days{display:flex;gap:8px;overflow-x:auto;padding:4px 0 8px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
-.cal-days::-webkit-scrollbar{display:none}
-.cal-day{flex:0 0 140px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:4px;cursor:pointer;transition:all .15s;border-left:3px solid var(--border)}
-.cal-day:hover{border-color:var(--border2);transform:translateY(-1px)}
-.cal-day.profit{border-left-color:var(--grn)}
-.cal-day.loss{border-left-color:var(--red)}
-.cal-day.today{box-shadow:0 0 8px rgba(0,230,118,.1)}
-.cal-day .cal-num{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--t3)}
-.cal-day .cal-pnl{font-family:var(--mono);font-size:20px;font-weight:800}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:12px}
+.cal-head{font-family:var(--mono);font-size:10px;font-weight:600;color:var(--t4);text-align:center;padding:4px 0;text-transform:uppercase}
+.cal-day{border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--mono);cursor:default;transition:all .15s;border:1px solid var(--border);background:var(--bg2);min-height:90px;padding:8px 4px}
+.cal-day:hover{border-color:var(--border2);transform:scale(1.02);z-index:1}
+.cal-day.empty{background:var(--bg);border-color:var(--border);opacity:.4}
+.cal-day.today{border-color:var(--grn);box-shadow:0 0 8px rgba(0,230,118,.15)}
+.cal-day.selected{border-color:var(--blue);box-shadow:0 0 0 2px rgba(68,138,255,.3)}
+.cal-day .cal-num{font-size:13px;font-weight:600;color:var(--t2);margin-bottom:4px}
+.cal-day .cal-pnl{font-size:14px;font-weight:700}
+.cal-day .cal-trades{font-size:11px;color:var(--t4);margin-top:3px}
+.cal-day.no-activity{background:var(--bg3)}
+.cal-day.profit{background:rgba(0,230,118,.1);border-color:rgba(0,230,118,.2)}
 .cal-day.profit .cal-pnl{color:var(--grn)}
+.cal-day.loss{background:rgba(255,82,82,.1);border-color:rgba(255,82,82,.2)}
 .cal-day.loss .cal-pnl{color:var(--red)}
-.cal-day .cal-positions{font-family:var(--mono);font-size:11px;color:var(--t4)}
-.cal-head{display:flex;gap:8px;padding:0 0 4px}
-.cal-head span{font-family:var(--mono);font-size:9px;font-weight:600;color:var(--t4);text-transform:uppercase;letter-spacing:.5px}
-.cal-legend{display:flex;gap:12px;font-family:var(--mono);font-size:10px;color:var(--t3);justify-content:flex-end;margin:8px 0}
+.cal-legend{display:flex;gap:10px;font-family:var(--mono);font-size:10px;color:var(--t3);justify-content:flex-end}
 .cal-legend span{display:flex;align-items:center;gap:4px}
 .cal-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
 .cal-positions{margin-top:16px}
@@ -135,22 +137,8 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
 .cal-pos-fee{font-family:var(--mono);font-size:10px;color:var(--t3)}
 .cal-pos-empty{font-family:var(--mono);font-size:11px;color:var(--t4);padding:16px;text-align:center;border:1px dashed var(--border);border-radius:var(--r)}
 
-@media(max-width:900px){
-  .cal-days{gap:6px}
-  .cal-day{flex:0 0 110px;padding:10px}
-  .cal-day .cal-pnl{font-size:16px}
-  .cal-pos-item{flex-direction:column;align-items:flex-start;gap:8px}
-  .cal-pos-right{text-align:left}
-  .cal-positions h3{flex-direction:column;gap:4px}
-}
-@media(max-width:480px){
-  .cal-day{flex:0 0 90px;padding:8px}
-  .cal-day .cal-num{font-size:11px}
-  .cal-day .cal-pnl{font-size:14px}
-  .cal-day .cal-positions{font-size:10px}
-  .cal-pos-meta{word-break:break-word}
-  .cal-pos-item{padding:8px 10px}
-}
+@media(max-width:900px){.cal-day{min-height:56px}.cal-num{font-size:10px}.cal-pnl{font-size:9px}}
+@media(max-width:480px){.cal-grid{gap:2px}.cal-day{min-height:48px}.cal-num{font-size:9px}.cal-pnl{font-size:8px}.cal-trades{display:none}.cal-legend{gap:10px;font-size:9px}}
 
 /* ═══ SETTINGS GRID ═══ */
 .settings-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
@@ -487,7 +475,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
         </div>
       </div>
       <div class="stats" id="calStats" style="margin-bottom:12px;grid-template-columns:repeat(4,1fr)"></div>
-      <div class="cal-days" id="calDays"></div>
+      <div class="cal-grid" id="calGrid"></div>
       <div class="cal-legend">
         <span><div class="cal-dot" style="background:var(--grn)"></div>Profit</span>
         <span><div class="cal-dot" style="background:var(--red)"></div>Loss</span>
@@ -732,8 +720,11 @@ async function loadCalendar(){
 }
 function renderCalendar(){
   const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   $('#calMonth').textContent=months[calMonth]+' '+calYear;
+  const first=new Date(calYear,calMonth,1);
   const last=new Date(calYear,calMonth+1,0);
+  const startDay=first.getDay();
   const totalDays=last.getDate();
   const today=new Date();
   const todayStr=today.toISOString().slice(0,10);
@@ -756,28 +747,27 @@ function renderCalendar(){
     <div class="stat"><div class="stat-l">Win Rate</div><div class="stat-v">${winRate}%</div></div>
     <div class="stat"><div class="stat-l">Active Days</div><div class="stat-v">${monthDays}</div></div>
   `;
-  // Horizontal scrollable days
-  let h='';
+  let h=days.map(d=>`<div class="cal-head">${d}</div>`).join('');
+  for(let i=0;i<startDay;i++) h+='<div class="cal-day empty"></div>';
   for(let d=1;d<=totalDays;d++){
-    const ds=`${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const dd=calDaily[ds];
-    const isToday=ds===todayStr;
-    const isSelected=ds===calSelDate;
+    const dateStr=`${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const dayData=calDaily[dateStr];
+    const isToday=dateStr===todayStr;
+    const isSelected=dateStr===calSelDate;
     let cls='cal-day';
     if(isToday)cls+=' today';
     if(isSelected)cls+=' selected';
-    if(!dd){
-      cls+=' no-activity';
-      h+=`<div class="${cls}" data-date="${ds}"><div class="cal-num">${d}</div><div class="cal-pnl" style="color:var(--t4)">—</div><div class="cal-positions">0 Positions</div></div>`;
+    if(!dayData){
+      h+=`<div class="${cls}" data-date="${dateStr}"><div class="cal-num">${d}</div></div>`;
     }else{
-      const pnl=dd.pnl_usd||0;
-      const posCount=dd.positions||dd.trades||0;
-      const cls2=pnl>0.001?'profit':pnl<-0.001?'loss':'no-activity';
-      h+=`<div class="${cls} ${cls2}" data-date="${ds}"><div class="cal-num">${d}</div><div class="cal-pnl">${pnl!==0?usd(pnl):'—'}</div><div class="cal-positions">${posCount} Positions</div></div>`;
+      const pnl=dayData.pnl_usd||0;
+      const posClass=pnl>0.001?'profit':pnl<-0.001?'loss':'no-activity';
+      cls+=' '+posClass;
+      const pnlStr=pnl!==0?usd(pnl):'—';
+      h+=`<div class="${cls}" data-date="${dateStr}" title="${dateStr}: ${usd(pnl)} (${dayData.trades} positions)"><div class="cal-num">${d}</div><div class="cal-pnl">${pnlStr}</div>${dayData.trades?`<div class="cal-trades">${dayData.trades} positions</div>`:''}</div>`;
     }
   }
-  $('#calDays').innerHTML=h;
-  // Click handlers
+  $('#calGrid').innerHTML=h;
   $$('.cal-day[data-date]').forEach(el=>{
     el.addEventListener('click',()=>{
       calSelDate=el.getAttribute('data-date');
@@ -785,9 +775,6 @@ function renderCalendar(){
       renderCalPositions();
     });
   });
-  // Auto-scroll to selected or today
-  const target=document.querySelector('.cal-day.selected')||document.querySelector('.cal-day.today');
-  if(target) target.scrollIntoView({behavior:'smooth',inline:'center',block:'nearest'});
 }
 function renderCalPositions(){
   const el=$('#calPositions');
