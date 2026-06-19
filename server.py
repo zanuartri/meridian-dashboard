@@ -2,7 +2,7 @@
 Meridian Dashboard API — Charon-inspired dark terminal UI
 Read-only visualization of /root/meridian/ state files
 """
-import json, os, urllib.request
+import json, os
 from pathlib import Path
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
@@ -10,7 +10,6 @@ from fastapi.responses import HTMLResponse
 app = FastAPI(title="Meridian Dashboard")
 MERIDIAN = Path("/root/meridian")
 WALLET = "DR2UaR2nhR1Wc7QezUyvDH655nTDCquvMijs2pDaY8Sy"
-HELIUS_KEY = os.environ.get("HELIUS_KEY", "")
 
 def load(fn):
     fp = MERIDIAN / fn
@@ -18,15 +17,6 @@ def load(fn):
     try:
         with open(fp) as f: return json.load(f)
     except: return {}
-
-def get_sol_balance():
-    try:
-        url = f"https://mainnet.helius-rpc.com/?api-key={HELIUS_KEY}"
-        payload = json.dumps({"jsonrpc":"2.0","id":1,"method":"getBalance","params":[WALLET]}).encode()
-        req = urllib.request.Request(url, data=payload, headers={"Content-Type":"application/json"})
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            return json.loads(resp.read()).get("result",{}).get("value",0) / 1e9
-    except: return 0
 
 def fmt(n, d=2):
     if n is None or n != n: return None
@@ -43,8 +33,7 @@ async def dashboard():
     closed = [p for p in perf if isinstance(p, dict)]
 
     # Wallet
-    sol = get_sol_balance()
-
+    
     # Active positions
     positions = state.get("positions", {})
     active = []
@@ -130,7 +119,6 @@ async def dashboard():
     return {
         "wallet": WALLET[:6] + "..." + WALLET[-4:],
         "wallet_full": WALLET,
-        "sol_balance": fmt(sol, 4),
         "positions": active,
         "position_count": len(active),
         "max_positions": config.get("maxPositions", 2),
