@@ -501,7 +501,7 @@ const $=s=>document.querySelector(s);
 const $$=s=>document.querySelectorAll(s);
 const f=(n,d=2)=>n==null||isNaN(n)?'—':Number(n).toFixed(d);
 const usd=n=>n==null||isNaN(n)?'—':(n>=0?'+':'-')+'$'+Math.abs(n).toFixed(2);
-const tm=m=>{if(!m)return'—';return m<60?m+'m':(m/60).toFixed(1)+'h'};
+const tm=m=>{if(!m)return'—';m=Math.round(m);return m<60?m+'m':(m/60).toFixed(1)+'h';};
 const cc=n=>n>0?'w':n<0?'l':'z';
 
 let allH=[],pgSz=15,pgCur=1,data=null,curPage='overview';
