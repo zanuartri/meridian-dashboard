@@ -8,9 +8,8 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 
 app = FastAPI(title="Meridian Dashboard")
-MERIDIAN = Path("/root/meridian")
-WALLET = "DR2UaR2nhR1Wc7QezUyvDH655nTDCquvMijs2pDaY8Sy"
-
+MERIDIAN = Path(os.environ.get("MERIDIAN_PATH", "/root/meridian"))
+WALLET = os.environ.get("MERIDIAN_WALLET", "")
 def load(fn):
     fp = MERIDIAN / fn
     if not fp.exists(): return {}
@@ -32,8 +31,10 @@ async def dashboard():
     perf = lessons.get("performance", []) if isinstance(lessons, dict) else []
     closed = [p for p in perf if isinstance(p, dict)]
 
-    # Wallet
-    
+    # Wallet — auto-detect from env or state.json owner
+    wallet = WALLET
+    if not wallet:
+        wallet = state.get("owner", "") or state.get("wallet", "")
     # Active positions
     positions = state.get("positions", {})
     active = []
@@ -117,8 +118,8 @@ async def dashboard():
     config_summary["strategyDetail"] = "Single-side SOL" if config.get("strategy") == "spot" else "Dual-side"
 
     return {
-        "wallet": WALLET[:6] + "..." + WALLET[-4:],
-        "wallet_full": WALLET,
+        "wallet": (wallet[:6] + "..." + wallet[-4:]) if wallet else "—",
+        "wallet_full": wallet,
         "positions": active,
         "position_count": len(active),
         "max_positions": config.get("maxPositions", 2),
