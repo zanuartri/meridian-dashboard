@@ -665,7 +665,7 @@ function renderPositions(positions){
         <div class="pos-addr">${p.address}</div>
         <div class="pos-row"><span class="k">Deposited</span><span class="v">${p.amount_sol} SOL</span></div>
         <div class="pos-row"><span class="k">Value</span><span class="v">${p.total_value_usd!=null?'$'+f(p.total_value_usd):'—'}</span></div>
-        <div class="pos-row"><span class="k">Unrealized PnL</span><span class="v ${p.unrealized_pnl_usd>=0?'grn':'red'}">${p.unrealized_pnl_usd!=null?usd(p.unrealized_pnl_usd):'—'}</span></div>
+        <div class="pos-row"><span class="k">Unrealized PnL</span><span class="v ${p.unrealized_pnl_usd>=0?'grn':'red'}">${p.unrealized_pnl_usd!=null?usd(p.unrealized_pnl_usd):'—'}${p.unrealized_pnl_pct!=null?` (${p.unrealized_pnl_pct>=0?'+':''}${f(p.unrealized_pnl_pct)}%)`:''}</span></div>
         <div class="pos-row"><span class="k">Unclaimed Fees</span><span class="v cyan">${p.unclaimed_fees_usd!=null?'$'+f(p.unclaimed_fees_usd,4):'—'}</span></div>
         <div class="pos-row"><span class="k">Range</span><span class="v">${p.bins_below}d × ${p.bin_step} step = ${rangeW.toFixed(0)}%</span></div>
         <div class="pos-row"><span class="k">Organic</span><span class="v">${p.organic_score||'—'}/100</span></div>
