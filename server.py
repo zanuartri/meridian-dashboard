@@ -144,14 +144,15 @@ async def dashboard():
 
 @app.get("/api/candidates")
 async def candidates():
+    import re
     decision_log = load("decision-log.json")
     decisions = decision_log.get("decisions", []) if isinstance(decision_log, dict) else []
     pool_mem = load("pool-memory.json")
 
-    # Sort by timestamp descending, return last 50
-    recent = sorted(decisions, key=lambda x: x.get("ts", ""), reverse=True)[:50]
+    # Sort by timestamp descending — return ALL, frontend handles pagination
+    recent = sorted(decisions, key=lambda x: x.get("ts", ""), reverse=True)
 
-    # Enrich with pool memory data
+    # Enrich with pool memory data + compute display fields
     for dec in recent:
         pool_addr = dec.get("pool")
         if pool_addr and pool_addr in pool_mem:
@@ -162,22 +163,72 @@ async def candidates():
                 "win_rate": fmt(pm.get("win_rate")),
                 "last_outcome": pm.get("last_outcome"),
             }
-        # Format metrics if present
-        metrics = dec.get("metrics", {})
-        if metrics:
-            dec["formatted_metrics"] = {
-                "mcap": f"${metrics.get('mcap', 0)/1000:.0f}K" if metrics.get("mcap") else None,
-                "tvl": f"${metrics.get('tvl', 0)/1000:.0f}K" if metrics.get("tvl") else None,
-                "volume": f"${metrics.get('volume', 0):.0f}" if metrics.get("volume") else None,
-                "organic": metrics.get("organic_score"),
-                "holders": metrics.get("holder_count"),
-                "fee_tvl": f"{metrics.get('fee_tvl_ratio', 0)*100:.2f}%" if metrics.get("fee_tvl_ratio") else None,
-            }
 
-    # Stats
+        tp = dec.get("type", "skip")
+        metrics = dec.get("metrics", {})
+        rejected = dec.get("rejected", [])
+
+        # Compute pool_display
+        pool_display = dec.get("pool_name") or ""
+        if not pool_display and rejected:
+            # Extract first pool name from rejected list
+            for r in rejected:
+                m = re.match(r"(\S+-(?:SOL|USDC))", str(r))
+                if m:
+                    pool_display = m.group(1)
+                    break
+        if not pool_display and dec.get("reason"):
+            m = re.match(r"-?\s*(\S+-(?:SOL|USDC))", str(dec["reason"]))
+            if m:
+                pool_display = m.group(1)
+        dec["pool_display"] = pool_display or "—"
+
+        # Compute detail_display per type
+        if tp == "deploy" and metrics:
+            amt = metrics.get("amount_sol", "")
+            strat = metrics.get("strategy", "")
+            abin = metrics.get("active_bin")
+            mn = metrics.get("min_bin")
+            mx = metrics.get("max_bin")
+            parts = []
+            if amt: parts.append(f"{amt} SOL")
+            if strat: parts.append(strat)
+            if abin is not None: parts.append(f"bin#{abin}")
+            if mn is not None and mx is not None: parts.append(f"range {mn}→{mx}")
+            dec["detail_display"] = " · ".join(parts) if parts else dec.get("summary", "—")
+        elif tp == "close" and metrics:
+            pnl = metrics.get("pnl_pct")
+            pnl_usd = metrics.get("pnl_usd")
+            fees = metrics.get("fees_usd")
+            held = metrics.get("minutes_held")
+            parts = []
+            if pnl is not None:
+                parts.append(f"{'+' if pnl >= 0 else ''}{pnl:.1f}%")
+            if pnl_usd is not None:
+                parts.append(f"${pnl_usd:+.4f}")
+            if fees is not None:
+                parts.append(f"${fees:.4f} fees")
+            if held:
+                parts.append(f"{held}m")
+            dec["detail_display"] = " · ".join(parts) if parts else dec.get("summary", "—")
+        elif tp == "no_deploy" and rejected:
+            # Show rejection reasons
+            reasons = [str(r)[:80] for r in rejected[:3]]
+            extra = len(rejected) - 3
+            display = " | ".join(reasons)
+            if extra > 0:
+                display += f" (+{extra} more)"
+            dec["detail_display"] = display[:200]
+        else:
+            dec["detail_display"] = dec.get("summary") or dec.get("reason", "—")[:200]
+
+        # Risks display
+        risks = dec.get("risks", [])
+        dec["risks_display"] = [str(r)[:60] for r in risks[:5]] if risks else []
+
+    # Stats — skip merged into rejected (both mean "not deployed")
     deploy_count = sum(1 for d in decisions if d.get("type") == "deploy")
-    no_deploy_count = sum(1 for d in decisions if d.get("type") == "no_deploy")
-    skip_count = sum(1 for d in decisions if d.get("type") == "skip")
+    no_deploy_count = sum(1 for d in decisions if d.get("type") in ("no_deploy", "skip"))
     close_count = sum(1 for d in decisions if d.get("type") == "close")
 
     return {
@@ -186,7 +237,6 @@ async def candidates():
             "total": len(decisions),
             "deploy": deploy_count,
             "no_deploy": no_deploy_count,
-            "skip": skip_count,
             "close": close_count,
         }
     }
@@ -241,6 +291,11 @@ async def learning():
 @app.get("/", response_class=HTMLResponse)
 async def index():
     return HTMLResponse((Path(__file__).parent / "index.html").read_text())
+
+@app.get("/favicon.svg")
+async def favicon():
+    from fastapi.responses import FileResponse
+    return FileResponse(Path(__file__).parent / "favicon.svg", media_type="image/svg+xml")
 
 @app.get("/api/calendar")
 async def calendar():

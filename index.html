@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MERIDIAN TERMINAL</title>
+<title>MERIDIAN • DLMM AGENT</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <style>
@@ -74,11 +75,13 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
 
 /* ═══ BOTTOM GRID ═══ */
 .bottom-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px}
-.cfg-box{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:16px}
-.cfg-box h3{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center}
+.cfg-box{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:16px;transition:border-color .15s}
+.cfg-box:hover{border-color:var(--border2)}
+.cfg-box h3{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:6px}
 .cfg-tag{font-size:10px;padding:2px 6px;border-radius:3px;background:var(--bg4);color:var(--t3)}
 .cfg-grid{display:grid;grid-template-columns:1fr;gap:6px}
-.cfg-item{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--border)}
+.cfg-item{display:flex;justify-content:space-between;padding:4px 6px;border-bottom:1px solid var(--border);border-radius:3px;transition:background .1s}
+.cfg-item:hover{background:var(--bg3)}
 .cfg-item:last-child{border-bottom:none}
 .cfg-k{font-family:var(--mono);font-size:11px;color:var(--t3)}
 .cfg-val{font-family:var(--mono);font-size:11px;color:var(--tx);font-weight:600}
@@ -180,6 +183,10 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
 .chip{display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:600}
 .chip.w{background:var(--grn-bg);color:var(--grn)}
 .chip.l{background:var(--red-bg);color:var(--red)}
+.chip.cyn{background:var(--cyan-bg);color:var(--cyan)}
+.chip.z{background:var(--bg3);color:var(--t4)}
+.cand-row{cursor:pointer}
+.cand-row:hover{background:var(--bg3)}
 
 /* ═══ PAGINATION ═══ */
 .pg{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-top:1px solid var(--border);font-family:var(--mono);font-size:11px;color:var(--t4)}
@@ -401,7 +408,12 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
     <div class="page" id="pg-candidates">
       <div class="term-head">
         <div class="term-title"><div class="term-dot"></div><h2>Candidates</h2></div>
-        <span style="font-family:var(--mono);font-size:10px;color:var(--t4)" id="candCount">—</span>
+        <div class="term-pills" id="candFilters">
+          <div class="term-pill on" data-filter="all" onclick="setCandFilter('all')">All</div>
+          <div class="term-pill" data-filter="deploy" onclick="setCandFilter('deploy')">Deployed</div>
+          <div class="term-pill" data-filter="no_deploy" onclick="setCandFilter('no_deploy')">Rejected</div>
+          <div class="term-pill" data-filter="close" onclick="setCandFilter('close')">Closed</div>
+        </div>
       </div>
       <div class="stats" id="candStats" style="margin-bottom:12px;grid-template-columns:repeat(4,1fr)"></div>
       <div class="tbl-box">
@@ -427,7 +439,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
       <div class="term-head">
         <div class="term-title"><div class="term-dot"></div><h2>Agent Learning</h2></div>
       </div>
-      <div class="stats" id="learnStats" style="margin-bottom:16px;grid-template-columns:repeat(4,1fr)"></div>
+      <div class="stats" id="learnStats" style="margin-bottom:16px;grid-template-columns:repeat(5,1fr)"></div>
       <div class="learn-grid">
         <div class="learn-card">
           <h3>Lessons Learned</h3>
@@ -435,7 +447,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
         </div>
         <div>
           <div class="learn-card" style="margin-bottom:12px">
-            <h3>Pool Memory</h3>
+            <h3>Pool Performance</h3>
             <div id="poolMemory"></div>
           </div>
           <div class="learn-card">
@@ -456,6 +468,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
           <div class="term-pill" id="calNext">›</div>
         </div>
       </div>
+      <div class="stats" id="calStats" style="margin-bottom:12px;grid-template-columns:repeat(4,1fr)"></div>
       <div class="cal-grid" id="calGrid"></div>
       <div class="cal-legend">
         <span><div class="cal-dot" style="background:var(--grn)"></div>Profit</span>
@@ -471,11 +484,11 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
         <div class="term-title"><div class="term-dot"></div><h2>Settings</h2></div>
       </div>
       <div class="settings-grid">
-        <div class="cfg-box"><h3>Strategy</h3><div class="cfg-grid" id="fullCfgStrategy"></div></div>
-        <div class="cfg-box"><h3>Risk & Management</h3><div class="cfg-grid" id="fullCfgRisk"></div></div>
-        <div class="cfg-box"><h3>Screening Filters</h3><div class="cfg-grid" id="fullCfgScreen"></div></div>
-        <div class="cfg-box"><h3>Schedule & Models</h3><div class="cfg-grid" id="fullCfgSchedule"></div></div>
-        <div class="cfg-box"><h3>Integrations</h3><div class="cfg-grid" id="fullCfgInt"></div></div>
+        <div class="cfg-box"><h3><span style="color:var(--grn)">⚡</span> Strategy</h3><div class="cfg-grid" id="fullCfgStrategy"></div></div>
+        <div class="cfg-box"><h3><span style="color:var(--red)">🛡</span> Risk & Management</h3><div class="cfg-grid" id="fullCfgRisk"></div></div>
+        <div class="cfg-box"><h3><span style="color:var(--blue)">🔍</span> Screening Filters</h3><div class="cfg-grid" id="fullCfgScreen"></div></div>
+        <div class="cfg-box"><h3><span style="color:var(--orange)">⏱</span> Schedule & Models</h3><div class="cfg-grid" id="fullCfgSchedule"></div></div>
+        <div class="cfg-box"><h3><span style="color:var(--cyn)">🔗</span> Integrations</h3><div class="cfg-grid" id="fullCfgInt"></div></div>
       </div>
     </div>
 
@@ -709,6 +722,25 @@ function renderCalendar(){
   const totalDays=last.getDate();
   const today=new Date();
   const todayStr=today.toISOString().slice(0,10);
+  // Monthly stats
+  let monthPnl=0,monthTrades=0,monthWins=0,monthDays=0;
+  for(let d=1;d<=totalDays;d++){
+    const ds=`${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const dd=calDaily[ds];
+    if(dd){
+      monthPnl+=dd.pnl_usd||0;
+      monthTrades+=dd.trades||0;
+      monthWins+=dd.wins||0;
+      monthDays++;
+    }
+  }
+  const winRate=monthTrades>0?Math.round(monthWins/monthTrades*100):0;
+  $('#calStats').innerHTML=`
+    <div class="stat"><div class="stat-l">Month PnL</div><div class="stat-v ${monthPnl>=0?'grn':'red'}">${usd(monthPnl)}</div></div>
+    <div class="stat"><div class="stat-l">Trades</div><div class="stat-v">${monthTrades}</div></div>
+    <div class="stat"><div class="stat-l">Win Rate</div><div class="stat-v">${winRate}%</div></div>
+    <div class="stat"><div class="stat-l">Active Days</div><div class="stat-v">${monthDays}</div></div>
+  `;
   let h=days.map(d=>`<div class="cal-head">${d}</div>`).join('');
   for(let i=0;i<startDay;i++) h+='<div class="cal-day empty"></div>';
   for(let d=1;d<=totalDays;d++){
@@ -730,7 +762,6 @@ function renderCalendar(){
     }
   }
   $('#calGrid').innerHTML=h;
-  // Click handlers
   $$('.cal-day[data-date]').forEach(el=>{
     el.addEventListener('click',()=>{
       calSelDate=el.getAttribute('data-date');
@@ -760,96 +791,139 @@ document.getElementById('calPrev').addEventListener('click',()=>{calMonth--;if(c
 document.getElementById('calNext').addEventListener('click',()=>{calMonth++;if(calMonth>11){calMonth=0;calYear++;}renderCalendar();});
 
 // ═══ CANDIDATES ═══
-let allC=[],candPgSz=20,candPgCur=1;
-function extractPool(dec){
-  if(dec.pool_name)return dec.pool_name;
-  const r=dec.reason||'';
-  const m=r.match(/^-?\s*(\S+-(?:SOL|USDC))/);
-  return m?m[1]:'—';
-}
+let allC=[],allCfiltered=[],candPgSz=15,candPgCur=1,candFilter='all';
 async function loadCandidates(){
   const d=await fj('/api/candidates');if(!d)return;
   const s=d.stats||{};
-  $('#candCount').textContent=(s.total||0)+' decisions';
+  const total=s.total||0;
+  const deployed=s.deploy||0;
+  const rejected=s.no_deploy||0;
+  const closed=s.close||0;
+  const accepted=deployed+closed;
+  const rate=total>0?Math.round(accepted/total*100):0;
   $('#candStats').innerHTML=`
-    <div class="stat"><div class="stat-l">Total</div><div class="stat-v">${s.total||0}</div></div>
-    <div class="stat"><div class="stat-l">Deployed</div><div class="stat-v grn">${s.deploy||0}</div></div>
-    <div class="stat"><div class="stat-l">Rejected</div><div class="stat-v red">${s.no_deploy||0}</div></div>
-    <div class="stat"><div class="stat-l">Skipped</div><div class="stat-v org">${s.skip||0}</div></div>
+    <div class="stat"><div class="stat-l">Acceptance</div><div class="stat-v ${rate>=50?'grn':'red'}">${rate}%</div></div>
+    <div class="stat"><div class="stat-l">Deployed</div><div class="stat-v grn">${deployed}</div></div>
+    <div class="stat"><div class="stat-l">Rejected</div><div class="stat-v red">${rejected}</div></div>
+    <div class="stat"><div class="stat-l">Closed</div><div class="stat-v cyn">${closed}</div></div>
   `;
   allC=d.decisions||[];
+  applyCandFilter();
+}
+function setCandFilter(f){
+  candFilter=f;
+  document.querySelectorAll('#candFilters .term-pill').forEach(p=>p.classList.toggle('on',p.dataset.filter===f));
   candPgCur=1;
+  applyCandFilter();
+}
+function applyCandFilter(){
+  allCfiltered=candFilter==='all'?allC:allC.filter(d=>d.type===candFilter||(candFilter==='no_deploy'&&d.type==='skip'));
   renderCandTbl();
 }
 function renderCandTbl(){
   const el=$('#candTbl');
-  if(!allC.length){el.innerHTML='<table><tbody><tr><td style="padding:24px;text-align:center;color:var(--t4);font-family:var(--mono);font-size:11px">No decisions recorded yet</td></tr></tbody></table>';$('#candPg').innerHTML='';return;}
-  const s=(candPgCur-1)*candPgSz,e=Math.min(s+candPgSz,allC.length);
-  const page=allC.slice(s,e);
-  let h='<table><thead><tr><th>Pool</th><th>Type</th><th>Details</th><th>Date</th></tr></thead><tbody>';
+  if(!allCfiltered.length){el.innerHTML='<table><tbody><tr><td style="padding:24px;text-align:center;color:var(--t4);font-family:var(--mono);font-size:11px">No '+(candFilter==='all'?'decisions':candFilter.replace('_',' '))+' recorded yet</td></tr></tbody></table>';$('#candPg').innerHTML='';return;}
+  const s=(candPgCur-1)*candPgSz,e=Math.min(s+candPgSz,allCfiltered.length);
+  const page=allCfiltered.slice(s,e);
+  let h='<table><thead><tr><th>Pool</th><th>Type</th><th>Details</th><th>Risks</th><th>Date</th></tr></thead><tbody>';
   for(const dec of page){
     const ts=dec.ts?new Date(dec.ts).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
     const tp=dec.type||'skip';
-    const tpCls=tp==='deploy'?'w':tp==='no_deploy'?'l':tp==='close'?'w':'z';
-    const pool=extractPool(dec);
-    // Build detail line from summary, metrics, or reason
-    let detail=dec.summary||'—';
-    if(tp==='close'&&dec.metrics){
-      const m=dec.metrics;
-      const pnl=m.pnl_pct!=null?`${m.pnl_pct>=0?'+':''}${Number(m.pnl_pct).toFixed(1)}%`:'';
-      const fees=m.fees_usd!=null?`fees $${Number(m.fees_usd).toFixed(4)}`:'';
-      const held=m.minutes_held?`${m.minutes_held}m`:'';
-      detail=`${pnl} ${fees} ${held}`.trim()||detail;
-    }else if(tp==='deploy'&&dec.metrics){
-      const m=dec.metrics;
-      detail=`${m.amount_sol}SOL ${m.strategy||''} ${m.active_bin!=null?'bin#'+m.active_bin:''}`;
-    }else if(tp==='no_deploy'&&dec.rejected&&dec.rejected.length){
-      detail=dec.rejected[0];
-      if(dec.rejected.length>1)detail+=` (+${dec.rejected.length-1} more)`;
-    }
+    const tpCls=tp==='deploy'?'grn':tp==='close'?'cyn':tp==='no_deploy'?'red':'z';
+    const pool=dec.pool_display||'—';
+    const detail=dec.detail_display||'—';
     const shortDetail=detail.length>50?detail.slice(0,50)+'…':detail;
-    h+=`<tr><td class="pn">${pool}</td><td><span class="chip ${tpCls}">${tp.replace('_',' ')}</span></td><td title="${detail}" style="max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--t3)">${shortDetail}</td><td style="color:var(--t4)">${ts}</td></tr>`;
+    const risks=dec.risks_display||[];
+    const riskHtml=risks.length?risks.slice(0,3).map(r=>`<span class="chip z" style="font-size:9px;margin:1px">${r}</span>`).join('')+(risks.length>3?`<span style="font-size:9px;color:var(--t4)">+${risks.length-3}</span>`:''):'—';
+    h+=`<tr class="cand-row" onclick="toggleCandDetail(this)">
+      <td class="pn" style="white-space:nowrap">${pool}</td>
+      <td><span class="chip ${tpCls}">${tp.replace('_',' ')}</span></td>
+      <td style="color:var(--t3);max-width:250px"><span title="${detail.replace(/"/g,'&quot;')}">${shortDetail}</span></td>
+      <td style="max-width:180px">${riskHtml}</td>
+      <td style="color:var(--t4);white-space:nowrap;font-size:11px">${ts}</td>
+    </tr>`;
+    const fullReason=dec.reason||'';
+    const rejected=dec.rejected||[];
+    let expandHtml='';
+    if(fullReason.length>50||rejected.length>1){
+      expandHtml=`<tr class="cand-expand" style="display:none"><td colspan="5" style="padding:8px 12px;background:var(--bg2);border-bottom:1px solid var(--border)">`;
+      if(rejected.length>1){
+        expandHtml+=`<div style="margin-bottom:6px;font-size:10px;color:var(--t4);font-family:var(--mono)">REJECTED CANDIDATES:</div>`;
+        for(const r of rejected){
+          expandHtml+=`<div style="font-size:11px;color:var(--t3);padding:2px 0;font-family:var(--mono)">• ${r}</div>`;
+        }
+      }
+      if(fullReason.length>20){
+        expandHtml+=`<div style="margin-top:6px;font-size:10px;color:var(--t4);font-family:var(--mono)">REASON:</div>`;
+        expandHtml+=`<div style="font-size:11px;color:var(--t3);white-space:pre-wrap;line-height:1.5;max-height:200px;overflow-y:auto">${fullReason}</div>`;
+      }
+      expandHtml+=`</td></tr>`;
+    }
+    h+=expandHtml;
   }
   h+='</tbody></table>';
   el.innerHTML=h;
-  // Pagination
-  const total=allC.length,pages=Math.ceil(total/candPgSz),ss=(candPgCur-1)*candPgSz+1,ee=Math.min(candPgCur*candPgSz,total);
-  let pg=`<div>Showing ${ss}–${ee} of ${total}</div><div class="pg-b">`;
+  const total=allCfiltered.length,pages=Math.ceil(total/candPgSz),ss=(candPgCur-1)*candPgSz+1,ee=Math.min(candPgCur*candPgSz,total);
+  let pg=`<div style="font-size:11px">${ss}–${ee} of ${total}</div><div class="pg-b">`;
   pg+=`<button onclick="goCandPg(1)" ${candPgCur===1?'disabled':''}>«</button><button onclick="goCandPg(${candPgCur-1})" ${candPgCur===1?'disabled':''}>‹</button>`;
   for(let i=1;i<=pages;i++){if(pages>7&&i>2&&i<pages-1&&Math.abs(i-candPgCur)>1){if(i===3||i===pages-2)pg+='<button disabled>…</button>';continue;}pg+=`<button class="${i===candPgCur?'on':''}" onclick="goCandPg(${i})">${i}</button>`;}
   pg+=`<button onclick="goCandPg(${candPgCur+1})" ${candPgCur===pages?'disabled':''}>›</button><button onclick="goCandPg(${pages})" ${candPgCur===pages?'disabled':''}>»</button></div>`;
   $('#candPg').innerHTML=pg;
 }
-function goCandPg(n){candPgCur=Math.max(1,Math.min(n,Math.ceil(allC.length/candPgSz)));renderCandTbl();}
+function toggleCandDetail(row){
+  const expand=row.nextElementSibling;
+  if(expand&&expand.classList.contains('cand-expand')){
+    expand.style.display=expand.style.display==='none'?'':'none';
+  }
+}
+function goCandPg(n){candPgCur=Math.max(1,Math.min(n,Math.ceil(allCfiltered.length/candPgSz)));renderCandTbl();}
 
 // ═══ LEARNING ═══
 async function loadLearning(){
   const d=await fj('/api/learning');if(!d)return;
   const ps=d.performance_summary||{};
+  const lessons=d.lessons||[];
+  const good=lessons.filter(l=>l.outcome==='good').length;
+  const poor=lessons.filter(l=>l.outcome==='poor').length;
+  const total=good+poor;
+  const accuracy=total>0?Math.round(good/total*100):0;
   $('#learnStats').innerHTML=`
     <div class="stat"><div class="stat-l">Total Trades</div><div class="stat-v">${ps.total_trades||0}</div></div>
     <div class="stat"><div class="stat-l">Total PnL</div><div class="stat-v ${(ps.total_pnl_usd||0)>=0?'grn':'red'}">${usd(ps.total_pnl_usd)}</div></div>
     <div class="stat"><div class="stat-l">Avg PnL</div><div class="stat-v">${f(ps.avg_pnl_pct)}%</div></div>
-    <div class="stat"><div class="stat-l">Avg Range Eff</div><div class="stat-v">${f(ps.avg_range_efficiency)}%</div></div>
+    <div class="stat"><div class="stat-l">Range Efficiency</div><div class="stat-v">${f(ps.avg_range_efficiency)}%</div></div>
+    <div class="stat"><div class="stat-l">Lesson Accuracy</div><div class="stat-v ${accuracy>=60?'grn':'red'}">${accuracy}%</div></div>
   `;
-  const lessons=d.lessons||[];
   if(lessons.length){
     $('#lessonsList').innerHTML=lessons.slice(0,15).map(l=>{
       const outcome=l.outcome||'neutral';
-      return `<div class="learn-item"><div class="learn-rule">${l.rule||'—'}</div><div class="learn-meta"><span class="learn-outcome ${outcome}">${outcome}</span>${l.pnl_pct!=null?`PnL: ${l.pnl_pct}%`:''}${l.confidence?`Conf: ${(l.confidence*100).toFixed(0)}%`:''}</div></div>`;
+      const ts=l.created_at?new Date(l.created_at).toLocaleString('en-US',{month:'short',day:'numeric'}):'';
+      return `<div class="learn-item"><div class="learn-rule">${l.rule||'—'}</div><div class="learn-meta"><span class="learn-outcome ${outcome}">${outcome}</span>${l.pnl_pct!=null?`PnL: ${l.pnl_pct}%`:''}${l.confidence?`Conf: ${(l.confidence*100).toFixed(0)}%`:''}${ts?`<span style="margin-left:auto;color:var(--t4)">${ts}</span>`:''}</div></div>`;
     }).join('');
-  }else{$('#lessonsList').innerHTML='<div style="color:var(--t4);font-size:11px">No lessons recorded</div>';}
+  }else{$('#lessonsList').innerHTML='<div style="color:var(--t4);font-size:11px;font-family:var(--mono)">No lessons recorded yet</div>';}
 
   const pools=d.pool_stats||[];
   if(pools.length){
-    $('#poolMemory').innerHTML=pools.slice(0,10).map(p=>`<div class="learn-item"><div style="display:flex;justify-content:space-between"><span class="learn-rule">${p.name||'—'}</span><span style="font-family:var(--mono);font-size:10px;color:var(--t3)">${p.total_deploys} deploys</span></div><div class="learn-meta">${p.avg_pnl_pct!=null?`Avg PnL: ${p.avg_pnl_pct}%`:''}${p.win_rate!=null?`Win: ${p.win_rate}%`:''}${p.cooldown_until?'🔴 Cooldown':''}</div></div>`).join('');
-  }else{$('#poolMemory').innerHTML='<div style="color:var(--t4);font-size:11px">No pool memory</div>';}
+    const maxDeploys=Math.max(...pools.map(p=>p.total_deploys||0));
+    $('#poolMemory').innerHTML=pools.slice(0,10).map(p=>{
+      const barW=maxDeploys>0?Math.round((p.total_deploys/maxDeploys)*100):0;
+      const wr=p.win_rate!=null?p.win_rate:0;
+      const wrColor=wr>=60?'var(--grn)':wr>=40?'var(--orange)':'var(--red)';
+      return `<div class="learn-item"><div style="display:flex;justify-content:space-between;align-items:center"><span class="learn-rule">${p.name||'—'}</span><span style="font-family:var(--mono);font-size:10px;color:var(--t3)">${p.total_deploys}x</span></div><div style="margin-top:6px;height:4px;background:var(--bg4);border-radius:2px;overflow:hidden"><div style="height:100%;width:${barW}%;background:${wrColor};border-radius:2px"></div></div><div class="learn-meta">${p.avg_pnl_pct!=null?`PnL: ${p.avg_pnl_pct}%`:''}${p.win_rate!=null?`Win: ${wr}%`:''}${p.cooldown_until?'🔴 Cooldown':''}</div></div>`;
+    }).join('');
+  }else{$('#poolMemory').innerHTML='<div style="color:var(--t4);font-size:11px;font-family:var(--mono)">No pool memory yet</div>';}
 
   const sw=d.signal_weights||{};
   if(Object.keys(sw).length){
     const entries=Object.entries(sw).sort((a,b)=>(b[1]||0)-(a[1]||0));
-    $('#signalWeights').innerHTML=entries.slice(0,10).map(([k,v])=>`<div class="cfg-item"><span class="cfg-k">${k}</span><span class="cfg-val">${typeof v==='number'?v.toFixed(3):v}</span></div>`).join('');
-  }else{$('#signalWeights').innerHTML='<div style="color:var(--t4);font-size:11px">No signal weights</div>';}
+    const maxW=Math.max(...entries.map(e=>Math.abs(e[1]||0)));
+    $('#signalWeights').innerHTML=entries.slice(0,10).map(([k,v])=>{
+      const val=typeof v==='number'?v:0;
+      const barW=maxW>0?Math.round(Math.abs(val)/maxW*100):0;
+      const barColor=val>=0?'var(--grn)':'var(--red)';
+      return `<div class="learn-item"><div style="display:flex;justify-content:space-between;align-items:center"><span class="learn-rule">${k}</span><span class="cfg-val" style="font-size:11px">${val.toFixed(3)}</span></div><div style="margin-top:4px;height:3px;background:var(--bg4);border-radius:2px;overflow:hidden"><div style="height:100%;width:${barW}%;background:${barColor};border-radius:2px"></div></div></div>`;
+    }).join('');
+  }else{$('#signalWeights').innerHTML='<div style="color:var(--t4);font-size:11px;font-family:var(--mono)">No signal weights yet</div>';}
 }
 
 // ═══ HISTORY ═══
