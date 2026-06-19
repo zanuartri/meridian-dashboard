@@ -107,15 +107,19 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
 /* ═══ CALENDAR ═══ */
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:12px}
 .cal-head{font-family:var(--mono);font-size:10px;font-weight:600;color:var(--t4);text-align:center;padding:4px 0;text-transform:uppercase}
-.cal-day{border-radius:4px;display:flex;flex-direction:column;align-items:flex-start;font-family:var(--mono);cursor:default;transition:all .15s;border:1px solid var(--border);background:var(--bg2);min-height:90px;padding:8px 6px}
+.cal-day{border-radius:4px;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;font-family:var(--mono);cursor:default;transition:all .15s;border:1px solid var(--border);background:var(--bg2);min-height:90px;padding:6px 8px;gap:2px}
+.cal-day .cal-num{font-size:13px;font-weight:600;color:var(--t2);align-self:flex-start}
+.cal-day .cal-center{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:1px}
+.cal-day .cal-pnl{font-size:14px;font-weight:700}
+.cal-day .cal-trades{font-size:11px;color:var(--t4)}
+.cal-day .cal-pos{font-size:11px}
+.cal-day .cal-pos.profit{color:var(--grn)}
+.cal-day .cal-pos.loss{color:var(--red)}
+.cal-day .cal-pos.neutral{color:var(--t4)}
 .cal-day:hover{border-color:var(--border2);transform:scale(1.02);z-index:1}
 .cal-day.empty{background:var(--bg);border-color:var(--border);opacity:.4}
 .cal-day.today{border-color:var(--grn);box-shadow:0 0 8px rgba(0,230,118,.15)}
 .cal-day.selected{border-color:var(--blue);box-shadow:0 0 0 2px rgba(68,138,255,.3)}
-.cal-day .cal-num{font-size:13px;font-weight:600;color:var(--t2);margin-bottom:4px}
-.cal-day .cal-pnl{font-size:14px;font-weight:700;margin-top:auto}
-.cal-day .cal-trades{font-size:11px;color:var(--t4);margin-top:3px}
-.cal-day.no-activity{background:var(--bg3)}
 .cal-day.profit{background:rgba(0,230,118,.1);border-left:3px solid var(--grn)}
 .cal-day.profit .cal-pnl{color:var(--grn)}
 .cal-day.loss{background:rgba(255,82,82,.1);border-left:3px solid var(--red)}
@@ -137,7 +141,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
 .cal-pos-fee{font-family:var(--mono);font-size:10px;color:var(--t3)}
 .cal-pos-empty{font-family:var(--mono);font-size:11px;color:var(--t4);padding:16px;text-align:center;border:1px dashed var(--border);border-radius:var(--r)}
 
-@media(max-width:900px){.cal-day{min-height:56px}.cal-num{font-size:10px}.cal-pnl{font-size:9px}}
+@media(max-width:900px){.cal-day{min-height:56px;padding:4px 6px}.cal-num{font-size:10px}.cal-pnl{font-size:10px}.cal-pos{font-size:9px}}
 @media(max-width:480px){.cal-grid{gap:2px}.cal-day{min-height:48px}.cal-num{font-size:9px}.cal-pnl{font-size:8px}.cal-trades{display:none}.cal-legend{gap:10px;font-size:9px}}
 
 /* ═══ SETTINGS GRID ═══ */
@@ -765,7 +769,7 @@ function renderCalendar(){
       cls+=' '+posClass;
       const pnlStr=pnl!==0?usd(pnl):'—';
       const posColor=pnl>0.001?'color:var(--grn)':pnl<-0.001?'color:var(--red)':'color:var(--t4)';
-      h+=`<div class="${cls}" data-date="${dateStr}" title="${dateStr}: ${usd(pnl)} (${dayData.trades} positions)"><div class="cal-num">${d}</div><div class="cal-pnl">${pnlStr}</div>${dayData.trades?`<div class="cal-trades" style="${posColor}">${dayData.trades} positions</div>`:''}</div>`;
+      h+=`<div class="${cls}" data-date="${dateStr}" title="${dateStr}: ${usd(pnl)} (${dayData.trades} positions)"><div class="cal-num">${d}</div><div class="cal-center"><div class="cal-pnl">${pnlStr}</div>${dayData.trades?`<div class="cal-pos ${posClass}">${dayData.trades} positions</div>`:''}</div></div>`;
     }
   }
   $('#calGrid').innerHTML=h;
