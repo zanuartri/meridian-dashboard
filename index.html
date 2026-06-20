@@ -564,12 +564,10 @@ function renderStats(d){
   const pnlColor=pnl>=0?'grn':'red';
   const unrColor=unrealized>=0?'grn':'red';
 
-  // Session duration from first trade
-  const h=d.history||[];
+  // Session duration from boot_time (agent process start)
   let session='—';
-  if(h.length>0){
-    const oldest=h.reduce((a,b)=>new Date(a.recorded_at)<new Date(b.recorded_at)?a:b);
-    const diff=(Date.now()-new Date(oldest.recorded_at).getTime())/(86400000);
+  if(d.boot_time){
+    const diff=(Date.now()-new Date(d.boot_time).getTime())/(86400000);
     session=diff<1?(diff*24).toFixed(1)+'h':diff.toFixed(1)+'d';
   }
 

@@ -117,6 +117,14 @@ async def dashboard():
     config_summary["solMode"] = config.get("solMode", False)
     config_summary["strategyDetail"] = "Single-side SOL" if config.get("strategy") == "spot" else "Dual-side"
 
+    # Boot time for accurate uptime
+    boot_time = None
+    boot_file = MERIDIAN / "boot_time"
+    if boot_file.exists():
+        try:
+            boot_time = boot_file.read_text().strip()
+        except: pass
+
     return {
         "wallet": (wallet[:6] + "..." + wallet[-4:]) if wallet else "—",
         "wallet_full": wallet,
@@ -139,6 +147,7 @@ async def dashboard():
         "oor_count": oor_count,
         "daily": days,
         "history": history,
+        "boot_time": boot_time,
         "config": config_summary,
     }
 
