@@ -220,11 +220,18 @@ async def dashboard():
         if not wallet:
             wallet = wb.get("wallet", "") or wallet
 
-    # Total equity = wallet total + open position value
+    # Net worth = tokens holding (wallet) + open positions + rent fees.
+    # Each Meteora DLMM position locks ~0.057 SOL rent (refundable on close).
+    # Meridian doesn't persist rent, so estimate per open position.
+    RENT_PER_POSITION_SOL = 0.057
     positions_value = sum((p.get("total_value_usd") or 0) for p in active)
+    rent_sol = len(active) * RENT_PER_POSITION_SOL
+    rent_usd = None
     total_equity = None
     if wallet_balance and wallet_balance.get("total_usd") is not None:
-        total_equity = fmt(wallet_balance["total_usd"] + positions_value)
+        sol_price = wallet_balance.get("sol_price") or 0
+        rent_usd = round(rent_sol * sol_price, 2) if sol_price else 0
+        total_equity = fmt(wallet_balance["total_usd"] + positions_value + (rent_usd or 0))
 
     # Active dev-mint cooldowns + blocklist
     cooldowns = active_cooldowns(pool_mem)
@@ -258,6 +265,8 @@ async def dashboard():
         "recent_events": recent_events,
         "wallet_balance": wallet_balance,
         "positions_value_usd": fmt(positions_value),
+        "rent_usd": rent_usd,
+        "rent_sol": fmt(rent_sol, 4),
         "total_equity_usd": total_equity,
         "cooldowns": cooldowns,
         "blocklist_count": blocklist_count,

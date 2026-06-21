@@ -585,10 +585,14 @@ function renderStats(d){
   }
 
   const wb=d.wallet_balance;
-  const walletVal=wb&&wb.total_usd!=null?'$'+f(wb.total_usd):'—';
-  const walletSub=wb&&wb.sol!=null?f(wb.sol,2)+' SOL · '+ago(wb.as_of):'no balance data';
+  const eq=d.total_equity_usd;
+  const posVal=d.positions_value_usd||0;
+  const rentVal=d.rent_usd||0;
+  const eqVal=eq!=null?'$'+f(eq):(wb&&wb.total_usd!=null?'$'+f(wb.total_usd):'—');
+  const eqSub=wb&&wb.total_usd!=null?'$'+f(wb.total_usd)+' + $'+f(posVal)+' pos + $'+f(rentVal)+' rent':'no balance data';
+  const eqTitle=(wb&&wb.as_of?'wallet as of '+ago(wb.as_of)+' · ':'')+'rent est. '+f(d.rent_sol,3)+' SOL/pos';
   $('#statRow').innerHTML=`
-    <div class="stat"><div class="stat-l">Wallet</div><div class="stat-v grn">${walletVal}</div><div class="stat-sub">${walletSub}</div></div>
+    <div class="stat" title="${eqTitle}"><div class="stat-l">Net Worth</div><div class="stat-v grn">${eqVal}</div><div class="stat-sub">${eqSub}</div></div>
     <div class="stat"><div class="stat-l">Open</div><div class="stat-v blue">${d.position_count}/${d.max_positions}</div><div class="stat-sub">positions active</div></div>
     <div class="stat"><div class="stat-l">Unrealized PnL</div><div class="stat-v ${unrColor}">${usd(unrealized)}</div><div class="stat-sub">open positions</div></div>
     <div class="stat"><div class="stat-l">Unclaimed Fees</div><div class="stat-v cyan">$${f(unclaimed,4)}</div><div class="stat-sub">pending claim</div></div>
