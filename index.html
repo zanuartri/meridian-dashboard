@@ -56,11 +56,12 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
 .term-pill.warn{border-color:var(--orange);color:var(--orange);background:var(--orange-bg)}
 
 /* ═══ STAT STRIP ═══ */
-.stats{display:grid;grid-template-columns:repeat(6,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:16px}
+.stats{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:16px}
 .stat{background:var(--bg2);padding:12px 14px}
 .stat-l{font-family:var(--mono);font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
 .stat-v{font-family:var(--mono);font-size:22px;font-weight:700;line-height:1}
 .stat-v.grn{color:var(--grn)}.stat-v.red{color:var(--red)}.stat-v.blue{color:var(--blue)}.stat-v.org{color:var(--orange)}.stat-v.cyan{color:var(--cyan)}.stat-v.pur{color:var(--purple)}
+.cfg-val.grn,.trade-pair .grn{color:var(--grn)}.cfg-val.red,.trade-pair .red{color:var(--red)}.cfg-val.blue,.trade-pair .blue{color:var(--blue)}.cfg-val.cyan,.trade-pair .cyan{color:var(--cyan)}.cfg-val.warn{color:var(--orange)}
 .stat-sub{font-family:var(--mono);font-size:11px;color:var(--t4);margin-top:4px}
 .stat-bar{width:100%;height:3px;background:var(--bg4);border-radius:2px;margin-top:6px;overflow:hidden;display:flex}
 .stat-bar .g{background:var(--grn);height:100%}
@@ -144,9 +145,8 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
 @media(max-width:900px){.cal-day{min-height:56px;padding:4px 6px}.cal-day .cal-num{font-size:10px}.cal-day .cal-pnl{font-size:10px}.cal-day .cal-pos{font-size:9px}}
 
 /* ═══ SETTINGS GRID ═══ */
-.settings-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
-.settings-grid .cfg-box:nth-child(4){grid-column:1/2}
-.settings-grid .cfg-box:nth-child(5){grid-column:2/3}
+.settings-grid{column-count:3;column-gap:12px}
+.settings-grid .cfg-box{break-inside:avoid;-webkit-column-break-inside:avoid;margin:0 0 12px;width:100%}
 
 /* ═══ POSITIONS ═══ */
 .pos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
@@ -218,6 +218,15 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
 .learn-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
 .learn-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:16px}
 .learn-card h3{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px}
+.restrict-sub{font-family:var(--mono);font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;font-weight:600}
+.restrict-empty{font-family:var(--mono);font-size:11px;color:var(--t4);padding:4px 0}
+.blocklist-text{font-family:var(--mono);font-size:11px;color:var(--t3)}
+.blocklist-text>div{padding:2px 0;border-bottom:1px solid var(--border);word-break:break-all}
+.blocklist-text>div:last-child{border-bottom:0}
+.learn-scroll{overflow-y:auto}
+.learn-scroll::-webkit-scrollbar{width:6px}
+.learn-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.learn-scroll::-webkit-scrollbar-track{background:transparent}
 .learn-item{padding:8px 10px;background:var(--bg3);border-radius:4px;border:1px solid var(--border);margin-bottom:6px}
 .learn-item:last-child{margin-bottom:0}
 .learn-rule{font-family:var(--mono);font-size:11px;color:var(--tx);line-height:1.4}
@@ -249,6 +258,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
   .mob-nav{display:block}
   .mob-head{display:block}
   .mn{padding:12px;padding-bottom:80px}
+  .stat-session{display:none}
   .stats{grid-template-columns:repeat(3,1fr)}
   .stat{padding:10px 10px}
   .stat-l{font-size:9px}
@@ -263,8 +273,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
   .chart-grid .chart-box:nth-child(3){display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .chart-wrap{height:160px}
   .bottom-grid{grid-template-columns:1fr}
-  .settings-grid{grid-template-columns:1fr}
-  .settings-grid .cfg-box:nth-child(4),.settings-grid .cfg-box:nth-child(5){grid-column:auto}
+  .settings-grid{column-count:1}
   .learn-grid{grid-template-columns:1fr}
   .pos-grid{grid-template-columns:1fr}
   .metrics{grid-template-columns:repeat(2,1fr)}
@@ -357,12 +366,12 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
     <div class="page active" id="pg-overview">
       <div class="term-head">
         <div class="term-title">
-          <div class="term-dot"></div>
-          <h2>Meridian Agent Active</h2>
+          <div class="term-dot" id="statusDot"></div>
+          <h2 id="statusH2">Meridian Agent Active</h2>
           <span style="font-family:var(--mono);font-size:10px;color:var(--t3);margin-left:4px">Solana DLMM LP Agent</span>
         </div>
         <div class="term-pills">
-          <div class="term-pill on">Online</div>
+          <div class="term-pill on" id="statusPill">Online</div>
           <div class="term-pill" id="pillStrategy">—</div>
           <div class="term-pill warn">Darwin</div>
         </div>
@@ -456,17 +465,20 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
       <div class="learn-grid">
         <div class="learn-card">
           <h3>Lessons Learned</h3>
-          <div id="lessonsList"></div>
+          <div class="learn-scroll" id="lessonsList"></div>
         </div>
-        <div>
-          <div class="learn-card" style="margin-bottom:12px">
-            <h3>Pool Performance</h3>
-            <div id="poolMemory"></div>
-          </div>
-          <div class="learn-card">
-            <h3>Signal Weights</h3>
-            <div id="signalWeights"></div>
-          </div>
+        <div class="learn-card">
+          <h3>Pool Performance</h3>
+          <div class="learn-scroll" id="poolMemory"></div>
+        </div>
+        <div class="learn-card">
+          <h3>Signal Weights <span class="cfg-tag" id="signalWeightsTag">—</span></h3>
+          <div class="restrict-empty" style="margin:-6px 0 10px">Darwin's learned multiplier per screening signal · &gt;1 boosted, &lt;1 decayed</div>
+          <div class="learn-scroll" id="signalWeights"></div>
+        </div>
+        <div class="learn-card">
+          <h3>Restrictions <span class="cfg-tag" id="learnRestrictTag">—</span></h3>
+          <div class="learn-scroll" id="learnRestrict"></div>
         </div>
       </div>
     </div>
@@ -499,9 +511,9 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
       <div class="settings-grid">
         <div class="cfg-box"><h3><span style="color:var(--grn)">⚡</span> Strategy</h3><div class="cfg-grid" id="fullCfgStrategy"></div></div>
         <div class="cfg-box"><h3><span style="color:var(--red)">🛡</span> Risk & Management</h3><div class="cfg-grid" id="fullCfgRisk"></div></div>
-        <div class="cfg-box"><h3><span style="color:var(--blue)">🔍</span> Screening Filters</h3><div class="cfg-grid" id="fullCfgScreen"></div></div>
         <div class="cfg-box"><h3><span style="color:var(--orange)">⏱</span> Schedule & Models</h3><div class="cfg-grid" id="fullCfgSchedule"></div></div>
-        <div class="cfg-box"><h3><span style="color:var(--cyn)">🔗</span> Integrations</h3><div class="cfg-grid" id="fullCfgInt"></div></div>
+        <div class="cfg-box"><h3><span style="color:var(--cyan)">🔗</span> Integrations</h3><div class="cfg-grid" id="fullCfgInt"></div></div>
+        <div class="cfg-box"><h3><span style="color:var(--blue)">🔍</span> Screening Filters</h3><div class="cfg-grid" id="fullCfgScreen"></div></div>
       </div>
     </div>
 
@@ -552,6 +564,7 @@ async function load(){
   renderPositions(d.positions);
   renderAlloc(d.positions);
   renderRecentTrades(d.history);
+  renderStatus(d);
   allH=d.history||[];
   $('#hCount').textContent=allH.length+' trades';
   renderTbl();
@@ -571,13 +584,17 @@ function renderStats(d){
     session=diff<1?(diff*24).toFixed(1)+'h':diff.toFixed(1)+'d';
   }
 
+  const wb=d.wallet_balance;
+  const walletVal=wb&&wb.total_usd!=null?'$'+f(wb.total_usd):'—';
+  const walletSub=wb&&wb.sol!=null?f(wb.sol,2)+' SOL · '+ago(wb.as_of):'no balance data';
   $('#statRow').innerHTML=`
+    <div class="stat"><div class="stat-l">Wallet</div><div class="stat-v grn">${walletVal}</div><div class="stat-sub">${walletSub}</div></div>
     <div class="stat"><div class="stat-l">Open</div><div class="stat-v blue">${d.position_count}/${d.max_positions}</div><div class="stat-sub">positions active</div></div>
     <div class="stat"><div class="stat-l">Unrealized PnL</div><div class="stat-v ${unrColor}">${usd(unrealized)}</div><div class="stat-sub">open positions</div></div>
     <div class="stat"><div class="stat-l">Unclaimed Fees</div><div class="stat-v cyan">$${f(unclaimed,4)}</div><div class="stat-sub">pending claim</div></div>
     <div class="stat"><div class="stat-l">Net PnL</div><div class="stat-v ${pnlColor}">${usd(pnl)}</div><div class="stat-sub">${d.total_trades} trades closed</div></div>
     <div class="stat"><div class="stat-l">Fees Earned</div><div class="stat-v grn">$${f(d.total_fees,4)}</div><div class="stat-sub">LP yield collected</div></div>
-    <div class="stat"><div class="stat-l">Session</div><div class="stat-v cyan">${session}</div><div class="stat-sub">agent uptime</div></div>
+    <div class="stat stat-session"><div class="stat-l">Session</div><div class="stat-v cyan">${session}</div><div class="stat-sub">agent uptime</div></div>
   `;
 }
 
@@ -641,10 +658,10 @@ function renderConfig(c){
 
   const g=(items)=>items.map(([k,v])=>`<div class="cfg-item"><span class="cfg-k">${k}</span><span class="cfg-val">${v}</span></div>`).join('');
   const strat=[['Strategy',c.strategy],['Max Deploy',c.maxDeployAmount+' SOL'],['Max Positions',c.maxPositions],['Position Size',(c.positionSizePct*100)+'%'],['Min SOL to Open',c.minSolToOpen||c.minToOpen||'—'],['Gas Reserve',c.gasReserve!=null?c.gasReserve+' SOL':'—'],['Sol Mode',c.solMode?'Yes':'No'],['Strategy Detail',c.strategyDetail||(c.strategy==='spot'?'Single-side SOL':'Dual-side')]];
-  const risk=[['Stop Loss',c.stopLossPct+'%'],['Take Profit','+'+c.takeProfitPct+'%'],['Trailing Trigger','+'+c.trailingTriggerPct+'%'],['Trailing Drop',c.trailingDropPct+'%'],['Emergency Drop',c.emergencyPriceDropPct+'%'],['Min Fee/TVL 24h',c.minFeePerTvl24h+'%'],['Min Age Before Yield',c.minAgeBeforeYieldCheck+'m'],['OOR Wait',c.outOfRangeWaitMinutes+'m'],['OOR Bins to Close',c.outOfRangeBinsToClose]];
-  const screen=[['Min TVL','$'+c.minTvl],['Max TVL','$'+c.maxTvl],['Min Volume','$'+c.minVolume],['Min Organic',c.minOrganic],['Min Quote Organic',c.minQuoteOrganic],['Min Holders',c.minHolders],['Min MCap','$'+c.minMcap],['Max MCap','$'+c.maxMcap],['Bin Step',c.minBinStep+'-'+c.maxBinStep],['Max Bot Holders',c.maxBotHoldersPct+'%'],['Max Top 10%',c.maxTop10Pct+'%'],['Min Token Fees',c.minTokenFeesSol+' SOL'],['Timeframe',c.timeframe],['Category',c.category]];
+  const risk=[['Stop Loss',c.stopLossPct+'%'],['Take Profit','+'+c.takeProfitPct+'%'],['Trailing Trigger','+'+c.trailingTriggerPct+'%'],['Trailing Drop',c.trailingDropPct+'%'],['Emergency Drop',c.emergencyPriceDropPct+'%'],['Min Fee/TVL 24h',c.minFeePerTvl24h+'%'],['Min Age Before Yield',c.minAgeBeforeYieldCheck+'m'],['OOR Wait',c.outOfRangeWaitMinutes+'m'],['OOR Bins to Close',c.outOfRangeBinsToClose],['OOR Cooldown',c.oorCooldownHours!=null?c.oorCooldownHours+'h':'—'],['OOR Cooldown Trigger',c.oorCooldownTriggerCount!=null?c.oorCooldownTriggerCount+'×':'—'],['Repeat Cooldown',c.repeatDeployCooldownEnabled?`${c.repeatDeployCooldownHours}h · ${c.repeatDeployCooldownTriggerCount}× · ${c.repeatDeployCooldownScope}`:'Off'],['Min Claim',c.minClaimAmount!=null?c.minClaimAmount:'—'],['Trailing TP',c.trailingTakeProfit?'On':'Off']];
+  const screen=[['Min TVL','$'+c.minTvl],['Max TVL','$'+c.maxTvl],['Min Volume','$'+c.minVolume],['Min Organic',c.minOrganic],['Min Quote Organic',c.minQuoteOrganic],['Min Holders',c.minHolders],['Min MCap','$'+c.minMcap],['Max MCap','$'+c.maxMcap],['Bin Step',c.minBinStep+'-'+c.maxBinStep],['Max Bot Holders',c.maxBotHoldersPct+'%'],['Max Top 10%',c.maxTop10Pct+'%'],['Max Volatility',c.maxVolatility!=null?c.maxVolatility:'—'],['Min Token Fees',c.minTokenFeesSol+' SOL'],['Min Fee/Active TVL',c.minFeeActiveTvlRatio!=null?c.minFeeActiveTvlRatio:'—'],['Min Token Age',c.minTokenAgeHours!=null?c.minTokenAgeHours+'h':'—'],['Max Token Age',c.maxTokenAgeHours!=null?c.maxTokenAgeHours+'h':'—'],['Min Vol to Rebalance',c.minVolumeToRebalance!=null?'$'+c.minVolumeToRebalance:'—'],['Screening Source',c.screeningSource||'—'],['Timeframe',c.timeframe],['Category',c.category]];
   const sched=[['Screening Interval',c.screeningIntervalMin+'m'],['Management Interval',c.managementIntervalMin+'m'],['Health Check Interval',c.healthCheckIntervalMin+'m'],['Screening Model',c.screeningModel],['Management Model',c.managementModel],['General Model',c.generalModel],['Temperature',c.temperature],['Max Tokens',c.maxTokens],['Max Steps',c.maxSteps]];
-  const int=[['Discord Signals',c.useDiscordSignals?'On':'Off'],['Discord Mode',c.discordSignalMode],['HiveMind URL',c.hiveMindUrl||'—'],['LPAgent Relay',c.lpAgentRelayEnabled?'On':'Off'],['PnL Source',c.pnlSource],['Darwin',c.darwinEnabled?'On':'Off'],['Darwin Window',c.darwinWindowDays+' days']];
+  const int=[['Discord Signals',c.useDiscordSignals?'On':'Off'],['Discord Mode',c.discordSignalMode],['HiveMind URL',c.hiveMindUrl||'—'],['LPAgent Relay',c.lpAgentRelayEnabled?'On':'Off'],['PnL Source',c.pnlSource],['Darwin',c.darwinEnabled?'On':'Off'],['Darwin Window',c.darwinWindowDays+' days'],['Darwin Boost',c.darwinBoost!=null?c.darwinBoost+'×':'—'],['Darwin Decay',c.darwinDecay!=null?c.darwinDecay+'×':'—'],['Darwin Floor',c.darwinFloor!=null?c.darwinFloor+'×':'—'],['Darwin Ceiling',c.darwinCeiling!=null?c.darwinCeiling+'×':'—'],['Darwin Min Samples',c.darwinMinSamples!=null?c.darwinMinSamples:'—'],['Darwin Recalc Every',c.darwinRecalcEvery!=null?c.darwinRecalcEvery:'—']];
   $('#fullCfgStrategy').innerHTML=g(strat);
   $('#fullCfgRisk').innerHTML=g(risk);
   $('#fullCfgScreen').innerHTML=g(screen);
@@ -712,6 +729,55 @@ function renderRecentTrades(history){
     const r=(t.close_reason||'—');const sr=r.length>20?r.slice(0,20)+'…':r;
     return `<div class="trade-item"><div class="trade-info"><div class="trade-pair">${t.pool_name||'—'}</div><div class="trade-meta">${tm(t.minutes_held)} • ${sr} • ${dt}</div></div><div><div class="trade-pnl ${pnl>=0?'grn':'red'}">${usd(pnl)}</div><div class="trade-pnl-sub">${pct>=0?'+':''}${f(pct)}%</div></div></div>`;
   }).join('');
+}
+
+function ago(ts){
+  if(!ts)return'—';
+  const s=(Date.now()-new Date(ts).getTime())/1000;
+  if(s<60)return Math.round(s)+'s ago';
+  if(s<3600)return Math.round(s/60)+'m ago';
+  if(s<86400)return(s/3600).toFixed(1)+'h ago';
+  return(s/86400).toFixed(1)+'d ago';
+}
+
+function renderLearnRestrict(d){
+  const cds=d.cooldowns||[],bl=d.blocklist||[];
+  $('#learnRestrictTag').textContent=cds.length+' cooldown'+(cds.length!==1?'s':'')+' • '+bl.length+' blocked';
+  let html='';
+  html+='<div class="restrict-sub">Active Cooldowns</div>';
+  if(cds.length){
+    html+=cds.map(c=>{
+      const r=(c.reason||'').length>34?(c.reason||'').slice(0,34)+'…':(c.reason||'');
+      return `<div class="learn-item"><div style="display:flex;justify-content:space-between;align-items:center"><span class="learn-rule">${c.name||'?'}</span><span class="cfg-val warn" style="font-size:11px">${c.hours_left}h left</span></div>${r?`<div class="learn-meta">${r}</div>`:''}</div>`;
+    }).join('');
+  }else{
+    html+='<div class="restrict-empty">None — no mints on cooldown</div>';
+  }
+  html+='<div class="restrict-sub" style="margin-top:12px">Dev Blocklist <span style="color:var(--t4)">'+bl.length+' mints</span></div>';
+  if(bl.length){
+    html+='<div class="blocklist-text">'+bl.map(b=>b.mint).filter(Boolean).map(m=>`<div>${m}</div>`).join('')+'</div>';
+  }else{
+    html+='<div class="restrict-empty">None</div>';
+  }
+  $('#learnRestrict').innerHTML=html;
+}
+
+function renderStatus(d){
+  const stale=d.stale_min;
+  // Stale if state hasn't updated in >20min (mgmt cycle is typically a few min)
+  const isStale=stale!=null&&stale>20;
+  const dot=$('#statusDot'),pill=$('#statusPill'),live=$('.sb-ft .live'),h2=$('#statusH2');
+  if(isStale){
+    if(pill){pill.textContent='Stale';pill.classList.remove('on');pill.classList.add('warn');}
+    if(dot)dot.style.background='var(--orange)';
+    if(live){live.textContent='● STALE';live.style.color='var(--orange)';}
+    if(h2)h2.textContent='Meridian — Last seen '+(stale<60?Math.round(stale)+'m':(stale/60).toFixed(1)+'h')+' ago';
+  }else{
+    if(pill){pill.textContent='Online';pill.classList.add('on');pill.classList.remove('warn');}
+    if(dot)dot.style.background='';
+    if(live){live.textContent='● LIVE';live.style.color='';}
+    if(h2)h2.textContent='Meridian Agent Active';
+  }
 }
 
 // ═══ CALENDAR ═══
@@ -811,13 +877,15 @@ async function loadCandidates(){
   const deployed=s.deploy||0;
   const rejected=s.no_deploy||0;
   const closed=s.close||0;
-  const accepted=deployed+closed;
-  const rate=total>0?Math.round(accepted/total*100):0;
+  // Acceptance = of pools screened (deploy + rejected), how many deployed.
+  // Closes are management actions, not screening outcomes — excluded.
+  const screened=deployed+rejected;
+  const rate=screened>0?Math.round(deployed/screened*100):0;
   $('#candStats').innerHTML=`
     <div class="stat"><div class="stat-l">Acceptance</div><div class="stat-v ${rate>=50?'grn':'red'}">${rate}%</div></div>
     <div class="stat"><div class="stat-l">Deployed</div><div class="stat-v grn">${deployed}</div></div>
     <div class="stat"><div class="stat-l">Rejected</div><div class="stat-v red">${rejected}</div></div>
-    <div class="stat"><div class="stat-l">Closed</div><div class="stat-v cyn">${closed}</div></div>
+    <div class="stat"><div class="stat-l">Closed</div><div class="stat-v cyan">${closed}</div></div>
   `;
   allC=d.decisions||[];
   applyCandFilter();
@@ -919,23 +987,40 @@ async function loadLearning(){
     const maxDeploys=Math.max(...pools.map(p=>p.total_deploys||0));
     $('#poolMemory').innerHTML=pools.slice(0,10).map(p=>{
       const barW=maxDeploys>0?Math.round((p.total_deploys/maxDeploys)*100):0;
-      const wr=p.win_rate!=null?p.win_rate:0;
+      const wr=p.win_rate!=null?Math.round(p.win_rate*100):0;
       const wrColor=wr>=60?'var(--grn)':wr>=40?'var(--orange)':'var(--red)';
       return `<div class="learn-item"><div style="display:flex;justify-content:space-between;align-items:center"><span class="learn-rule">${p.name||'—'}</span><span style="font-family:var(--mono);font-size:10px;color:var(--t3)">${p.total_deploys}x</span></div><div style="margin-top:6px;height:4px;background:var(--bg4);border-radius:2px;overflow:hidden"><div style="height:100%;width:${barW}%;background:${wrColor};border-radius:2px"></div></div><div class="learn-meta">${p.avg_pnl_pct!=null?`PnL: ${p.avg_pnl_pct}%`:''}${p.win_rate!=null?`Win: ${wr}%`:''}${p.cooldown_until?'🔴 Cooldown':''}</div></div>`;
     }).join('');
   }else{$('#poolMemory').innerHTML='<div style="color:var(--t4);font-size:11px;font-family:var(--mono)">No pool memory yet</div>';}
 
-  const sw=d.signal_weights||{};
+  const swRaw=d.signal_weights||{};
+  const sw=swRaw.weights||{};  // weights live under .weights; siblings are recalc_count/history/last_recalc
   if(Object.keys(sw).length){
-    const entries=Object.entries(sw).sort((a,b)=>(b[1]||0)-(a[1]||0));
-    const maxW=Math.max(...entries.map(e=>Math.abs(e[1]||0)));
-    $('#signalWeights').innerHTML=entries.slice(0,10).map(([k,v])=>{
-      const val=typeof v==='number'?v:0;
-      const barW=maxW>0?Math.round(Math.abs(val)/maxW*100):0;
-      const barColor=val>=0?'var(--grn)':'var(--red)';
-      return `<div class="learn-item"><div style="display:flex;justify-content:space-between;align-items:center"><span class="learn-rule">${k}</span><span class="cfg-val" style="font-size:11px">${val.toFixed(3)}</span></div><div style="margin-top:4px;height:3px;background:var(--bg4);border-radius:2px;overflow:hidden"><div style="height:100%;width:${barW}%;background:${barColor};border-radius:2px"></div></div></div>`;
+    $('#signalWeightsTag').textContent=(swRaw.recalc_count!=null?swRaw.recalc_count+' recalcs':'');
+    const entries=Object.entries(sw).filter(e=>typeof e[1]==='number').sort((a,b)=>b[1]-a[1]);
+    const maxW=Math.max(...entries.map(e=>Math.abs(e[1])),1.0);
+    $('#signalWeights').innerHTML=entries.map(([k,val])=>{
+      const barW=Math.round(Math.abs(val)/maxW*100);
+      // >1 = Darwin boosted this signal (predictive), <1 = decayed, =1 = neutral
+      const barColor=val>1.02?'var(--grn)':val<0.98?'var(--orange)':'var(--t4)';
+      return `<div class="learn-item"><div style="display:flex;justify-content:space-between;align-items:center"><span class="learn-rule">${k}</span><span class="cfg-val ${val>1.02?'grn':val<0.98?'warn':''}" style="font-size:11px">${val.toFixed(2)}×</span></div><div style="margin-top:4px;height:3px;background:var(--bg4);border-radius:2px;overflow:hidden"><div style="height:100%;width:${barW}%;background:${barColor};border-radius:2px"></div></div></div>`;
     }).join('');
   }else{$('#signalWeights').innerHTML='<div style="color:var(--t4);font-size:11px;font-family:var(--mono)">No signal weights yet</div>';}
+
+  renderLearnRestrict(d);
+  syncLearnHeights();
+}
+
+// Make all learn cards match Signal Weights height; scroll if longer
+function syncLearnHeights(){
+  const ids=['#lessonsList','#poolMemory','#signalWeights','#learnRestrict'];
+  ids.forEach(s=>{const el=$(s);if(el)el.style.height='auto';});
+  requestAnimationFrame(()=>{
+    const ref=$('#signalWeights');if(!ref)return;
+    const h=ref.scrollHeight;
+    if(!h)return;
+    ids.forEach(s=>{const el=$(s);if(el)el.style.height=h+'px';});
+  });
 }
 
 // ═══ HISTORY ═══

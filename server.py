@@ -3,6 +3,7 @@ Meridian Dashboard API — Charon-inspired dark terminal UI
 Read-only visualization of /root/meridian/ state files
 """
 import json, os
+from datetime import datetime, timezone
 from pathlib import Path
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
@@ -16,6 +17,65 @@ def load(fn):
     try:
         with open(fp) as f: return json.load(f)
     except: return {}
+
+def active_cooldowns(pool_mem):
+    """Dev-mint cooldowns from pool memory that are still in effect."""
+    now = datetime.now(timezone.utc)
+    out = []
+    for addr, pm in pool_mem.items():
+        if not isinstance(pm, dict): continue
+        cu = pm.get("base_mint_cooldown_until")
+        if not cu: continue
+        try:
+            until = datetime.fromisoformat(cu.replace("Z", "+00:00"))
+        except: continue
+        if until <= now: continue
+        out.append({
+            "name": pm.get("name", "?"),
+            "until": cu,
+            "hours_left": round((until - now).total_seconds() / 3600, 1),
+            "reason": pm.get("base_mint_cooldown_reason", ""),
+        })
+    out.sort(key=lambda x: x["until"])
+    return out
+
+def blocklist_entries():
+    bl = load("dev-blocklist.json")
+    if not isinstance(bl, dict): return []
+    out = []
+    for mint, v in bl.items():
+        v = v if isinstance(v, dict) else {}
+        out.append({
+            "mint": mint,
+            "label": v.get("label", ""),
+            "reason": v.get("reason", ""),
+            "added_at": v.get("added_at", ""),
+        })
+    out.sort(key=lambda x: x.get("added_at", ""), reverse=True)
+    return out
+
+def latest_wallet_balance():
+    """Read the most recent get_wallet_balance result from Meridian's action logs.
+    Meridian doesn't persist balance to state — it logs each tool call to
+    logs/actions-YYYY-MM-DD.jsonl. We scan newest files first for the last success."""
+    logdir = MERIDIAN / "logs"
+    if not logdir.exists(): return None
+    files = sorted(logdir.glob("actions-*.jsonl"), reverse=True)
+    for fp in files:
+        try:
+            lines = fp.read_text().splitlines()
+        except: continue
+        for line in reversed(lines):
+            line = line.strip()
+            if not line or '"get_wallet_balance"' not in line: continue
+            try:
+                rec = json.loads(line)
+            except: continue
+            if rec.get("tool") != "get_wallet_balance" or not rec.get("success"): continue
+            res = rec.get("result", {}) or {}
+            res["as_of"] = rec.get("timestamp")
+            return res
+    return None
 
 def fmt(n, d=2):
     if n is None or n != n: return None
@@ -125,6 +185,51 @@ async def dashboard():
             boot_time = boot_file.read_text().strip()
         except: pass
 
+    # Agent liveness — derive from state.json freshness
+    last_updated = state.get("lastUpdated")
+    stale_min = None
+    if last_updated:
+        try:
+            lu = datetime.fromisoformat(last_updated.replace("Z", "+00:00"))
+            stale_min = (datetime.now(timezone.utc) - lu).total_seconds() / 60
+        except: pass
+
+    # Recent events feed (deploy/close) from state
+    raw_events = state.get("recentEvents", []) if isinstance(state, dict) else []
+    recent_events = sorted(
+        [e for e in raw_events if isinstance(e, dict)],
+        key=lambda x: x.get("ts", ""), reverse=True
+    )[:15]
+
+    # Wallet balance (from logs — Meridian doesn't persist it)
+    wb = latest_wallet_balance()
+    wallet_balance = None
+    if wb:
+        wallet_balance = {
+            "sol": fmt(wb.get("sol"), 4),
+            "sol_usd": fmt(wb.get("sol_usd")),
+            "sol_price": fmt(wb.get("sol_price")),
+            "usdc": fmt(wb.get("usdc")),
+            "total_usd": fmt(wb.get("total_usd")),
+            "tokens": [
+                {"symbol": t.get("symbol", "?"), "balance": fmt(t.get("balance"), 4), "usd": fmt(t.get("usd"))}
+                for t in (wb.get("tokens") or []) if isinstance(t, dict)
+            ],
+            "as_of": wb.get("as_of"),
+        }
+        if not wallet:
+            wallet = wb.get("wallet", "") or wallet
+
+    # Total equity = wallet total + open position value
+    positions_value = sum((p.get("total_value_usd") or 0) for p in active)
+    total_equity = None
+    if wallet_balance and wallet_balance.get("total_usd") is not None:
+        total_equity = fmt(wallet_balance["total_usd"] + positions_value)
+
+    # Active dev-mint cooldowns + blocklist
+    cooldowns = active_cooldowns(pool_mem)
+    blocklist_count = len(blocklist_entries())
+
     return {
         "wallet": (wallet[:6] + "..." + wallet[-4:]) if wallet else "—",
         "wallet_full": wallet,
@@ -148,8 +253,23 @@ async def dashboard():
         "daily": days,
         "history": history,
         "boot_time": boot_time,
+        "last_updated": last_updated,
+        "stale_min": fmt(stale_min, 1),
+        "recent_events": recent_events,
+        "wallet_balance": wallet_balance,
+        "positions_value_usd": fmt(positions_value),
+        "total_equity_usd": total_equity,
+        "cooldowns": cooldowns,
+        "blocklist_count": blocklist_count,
         "config": config_summary,
     }
+
+@app.get("/api/wallet")
+async def wallet_endpoint():
+    wb = latest_wallet_balance()
+    if not wb:
+        return {"available": False}
+    return {"available": True, **wb}
 
 @app.get("/api/candidates")
 async def candidates():
@@ -285,10 +405,15 @@ async def learning():
     avg_pnl_pct = sum(p.get("pnl_pct", 0) for p in perf) / len(perf) if perf else 0
     avg_range_eff = sum(p.get("range_efficiency", 0) for p in perf if p.get("range_efficiency")) / max(1, len([p for p in perf if p.get("range_efficiency")]))
 
+    cooldowns = active_cooldowns(pool_mem)
+    blocklist = blocklist_entries()
+
     return {
         "lessons": lessons_sorted,
         "signal_weights": signal_weights,
         "pool_stats": pool_stats,
+        "cooldowns": cooldowns,
+        "blocklist": blocklist,
         "performance_summary": {
             "total_trades": len(perf),
             "total_pnl_usd": fmt(total_pnl),
