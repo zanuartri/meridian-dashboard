@@ -591,19 +591,15 @@ function renderStats(d){
   const rentVal=d.rent_usd||0;
   const hasWallet=d.wallet_rpc_enabled && d.has_helius_key;
   
-  // Net Worth — show if wallet balance available OR positions exist
+  // Net Worth — only show when wallet RPC is enabled
   let eqVal, eqSub, eqTitle;
   if(hasWallet && wb && wb.total_usd!=null){
     eqVal='$'+f(eq||(wb.total_usd+posVal+(rentVal||0)));
     eqSub='$'+f(wb.total_usd)+' wallet + $'+f(posVal)+' pos + $'+f(rentVal)+' rent';
     eqTitle=(wb.as_of?'wallet as of '+ago(wb.as_of)+' · ':'')+'rent est. '+f(d.rent_sol,3)+' SOL/pos';
-  } else if(posVal>0){
-    eqVal='$'+f(posVal);
-    eqSub='$'+f(posVal)+' in positions';
-    eqTitle='no wallet balance data';
   } else {
     eqVal='—';
-    eqSub='no balance data';
+    eqSub='wallet RPC disabled';
     eqTitle='';
   }
 
@@ -611,7 +607,7 @@ function renderStats(d){
   const sessionClass=hasWallet?'stat stat-session':'stat stat-session-always';
 
   let statsHtml=`
-    <div class="stat" title="${eqTitle}"><div class="stat-l">Net Worth</div><div class="stat-v grn">${eqVal}</div><div class="stat-sub">${eqSub}</div></div>
+    ${hasWallet ? `<div class="stat" title="${eqTitle}"><div class="stat-l">Net Worth</div><div class="stat-v grn">${eqVal}</div><div class="stat-sub">${eqSub}</div></div>` : ''}
     <div class="stat"><div class="stat-l">Open</div><div class="stat-v blue">${d.position_count}/${d.max_positions}</div><div class="stat-sub">positions active</div></div>
     <div class="stat"><div class="stat-l">Unrealized PnL</div><div class="stat-v ${unrColor}">${usd(unrealized)}</div><div class="stat-sub">open positions</div></div>
     <div class="stat"><div class="stat-l">Unclaimed Fees</div><div class="stat-v cyan">$${f(unclaimed,4)}</div><div class="stat-sub">pending claim</div></div>
