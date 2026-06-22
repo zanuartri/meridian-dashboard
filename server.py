@@ -2,7 +2,7 @@
 Meridian Dashboard API — Charon-inspired dark terminal UI
 Read-only visualization of /root/meridian/ state files
 """
-import json, os
+import json, os, urllib.request, urllib.error
 from datetime import datetime, timezone
 from pathlib import Path
 from fastapi import FastAPI
@@ -11,6 +11,20 @@ from fastapi.responses import HTMLResponse
 app = FastAPI(title="Meridian Dashboard")
 MERIDIAN = Path(os.environ.get("MERIDIAN_PATH", "/root/meridian"))
 WALLET = os.environ.get("MERIDIAN_WALLET", "")
+
+# Load Helius API key from Meridian .env
+HELIUS_API_KEY = ""
+_meridian_env = MERIDIAN / ".env"
+if _meridian_env.exists():
+    try:
+        for line in _meridian_env.read_text().splitlines():
+            line = line.strip()
+            if line.startswith("HELIUS_API_KEY="):
+                HELIUS_API_KEY = line.split("=", 1)[1].strip().strip('"').strip("'")
+                break
+    except:
+        pass
+
 def load(fn):
     fp = MERIDIAN / fn
     if not fp.exists(): return {}
@@ -76,6 +90,129 @@ def latest_wallet_balance():
             res["as_of"] = rec.get("timestamp")
             return res
     return None
+
+
+def fetch_wallet_rpc():
+    """Fetch wallet balance directly via Helius RPC API.
+    Returns SOL balance, SOL price, and token accounts."""
+    if not HELIUS_API_KEY:
+        return None
+
+    # Derive wallet address from state or config
+    wallet = WALLET
+    if not wallet:
+        state = load("state.json")
+        wallet = state.get("owner", "") or state.get("wallet", "")
+    if not wallet:
+        # Try to get from latest log
+        wb = latest_wallet_balance()
+        if wb:
+            wallet = wb.get("wallet", "")
+
+    if not wallet:
+        return None
+
+    try:
+        # Get SOL balance via getBalance
+        balance_url = f"https://mainnet.helius-rpc.com/?api-key={HELIUS_API_KEY}"
+        balance_payload = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "getBalance",
+            "params": [wallet]
+        }
+        data = json.dumps(balance_payload).encode("utf-8")
+        req = urllib.request.Request(balance_url, data=data, headers={"Content-Type": "application/json"})
+        resp = urllib.request.urlopen(req, timeout=10)
+        balance_result = json.loads(resp.read())
+
+        if "result" not in balance_result:
+            return None
+
+        lamports = balance_result["result"]["value"]
+        sol = lamports / 1e9
+
+        # Get SOL price via CoinGecko
+        price_url = "https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd"
+        try:
+            price_req = urllib.request.Request(price_url)
+            price_resp = urllib.request.urlopen(price_req, timeout=10)
+            price_data = json.loads(price_resp.read())
+            sol_price = float(price_data["solana"]["usd"])
+        except:
+            sol_price = 0
+
+        sol_usd = sol * sol_price
+
+        # Get token accounts via getTokenAccountsByOwner
+        token_payload = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "getTokenAccountsByOwner",
+            "params": [
+                wallet,
+                {"programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"},
+                {"encoding": "jsonParsed"}
+            ]
+        }
+        token_data = json.dumps(token_payload).encode("utf-8")
+        token_req = urllib.request.Request(balance_url, data=token_data, headers={"Content-Type": "application/json"})
+        token_resp = urllib.request.urlopen(token_req, timeout=10)
+        token_result = json.loads(token_resp.read())
+
+        tokens = []
+        total_usd = sol_usd
+        usdc = 0
+
+        for account in token_result.get("result", {}).get("value", []):
+            info = account["account"]["data"]["parsed"]["info"]
+            token_amount = info["tokenAmount"]
+            mint = info["mint"]
+            balance = float(token_amount["uiAmount"] or 0)
+
+            if balance == 0:
+                continue
+
+            # Known tokens
+            symbol = mint[:8]
+            usd_value = 0
+
+            if mint == "So11111111111111111111111111111111111111112":
+                symbol = "SOL"
+                usd_value = balance * sol_price
+            elif mint == "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v":
+                symbol = "USDC"
+                usdc = balance
+                usd_value = balance
+            elif mint == "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB":
+                symbol = "USDT"
+                usd_value = balance
+            else:
+                # Try to get price for other tokens (skip for now)
+                usd_value = 0
+
+            total_usd += usd_value
+            tokens.append({
+                "mint": mint,
+                "symbol": symbol,
+                "balance": round(balance, 4),
+                "usd": round(usd_value, 2)
+            })
+
+        return {
+            "wallet": wallet,
+            "sol": round(sol, 4),
+            "sol_price": round(sol_price, 2),
+            "sol_usd": round(sol_usd, 2),
+            "usdc": round(usdc, 2),
+            "tokens": tokens,
+            "total_usd": round(total_usd, 2),
+            "as_of": datetime.now(timezone.utc).isoformat(),
+        }
+
+    except Exception as e:
+        print(f"[RPC] Error fetching wallet balance: {e}")
+        return None
 
 def fmt(n, d=2):
     if n is None or n != n: return None
@@ -201,8 +338,8 @@ async def dashboard():
         key=lambda x: x.get("ts", ""), reverse=True
     )[:15]
 
-    # Wallet balance (from logs — Meridian doesn't persist it)
-    wb = latest_wallet_balance()
+    # Wallet balance — prefer RPC (live), fallback to logs
+    wb = fetch_wallet_rpc() or latest_wallet_balance()
     wallet_balance = None
     if wb:
         wallet_balance = {
@@ -221,16 +358,45 @@ async def dashboard():
             wallet = wb.get("wallet", "") or wallet
 
     # Net worth = tokens holding (wallet) + open positions + rent fees.
-    # Each Meteora DLMM position locks ~0.057 SOL rent (refundable on close).
-    # Meridian doesn't persist rent, so estimate per open position.
-    RENT_PER_POSITION_SOL = 0.057
-    positions_value = sum((p.get("total_value_usd") or 0) for p in active)
-    rent_sol = len(active) * RENT_PER_POSITION_SOL
-    rent_usd = None
+    # Position value: prefer last_total_value_usd, fallback to amount_sol × sol_price
+    sol_price = wallet_balance.get("sol_price") if wallet_balance else 0
+    positions_value = 0
+    rent_sol_total = 0
+    for p in active:
+        val_usd = p.get("total_value_usd")
+        if val_usd is None or val_usd == 0:
+            # Fallback: use amount_sol from state.json
+            amount_sol = p.get("amount_sol", 0) or 0
+            val_usd = amount_sol * sol_price if sol_price else 0
+        positions_value += (val_usd or 0)
+    
+    # Rent: query on-chain via Helius RPC for each position
+    rent_sol_total = 0
+    if HELIUS_API_KEY:
+        for p in active:
+            pos_addr = p.get("address")
+            if not pos_addr:
+                continue
+            try:
+                rent_payload = {
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "getMinimumBalanceForRentExemption",
+                    "params": [3228]  # DLMM position account size
+                }
+                rent_data = json.dumps(rent_payload).encode("utf-8")
+                rpc_url = f"https://mainnet.helius-rpc.com/?api-key={HELIUS_API_KEY}"
+                rent_req = urllib.request.Request(rpc_url, data=rent_data, headers={"Content-Type": "application/json"})
+                rent_resp = urllib.request.urlopen(rent_req, timeout=10)
+                rent_result = json.loads(rent_resp.read())
+                rent_lamports = rent_result.get("result", 0)
+                rent_sol_total += rent_lamports / 1e9
+            except:
+                rent_sol_total += 0.057  # Fallback estimate
+    
+    rent_usd = round(rent_sol_total * sol_price, 2) if sol_price else 0
     total_equity = None
     if wallet_balance and wallet_balance.get("total_usd") is not None:
-        sol_price = wallet_balance.get("sol_price") or 0
-        rent_usd = round(rent_sol * sol_price, 2) if sol_price else 0
         total_equity = fmt(wallet_balance["total_usd"] + positions_value + (rent_usd or 0))
 
     # Active dev-mint cooldowns + blocklist
@@ -240,6 +406,7 @@ async def dashboard():
     return {
         "wallet": (wallet[:6] + "..." + wallet[-4:]) if wallet else "—",
         "wallet_full": wallet,
+        "has_helius_key": bool(HELIUS_API_KEY),
         "positions": active,
         "position_count": len(active),
         "max_positions": config.get("maxPositions", 2),
@@ -266,7 +433,7 @@ async def dashboard():
         "wallet_balance": wallet_balance,
         "positions_value_usd": fmt(positions_value),
         "rent_usd": rent_usd,
-        "rent_sol": fmt(rent_sol, 4),
+        "rent_sol": fmt(rent_sol_total, 4),
         "total_equity_usd": total_equity,
         "cooldowns": cooldowns,
         "blocklist_count": blocklist_count,
@@ -275,10 +442,10 @@ async def dashboard():
 
 @app.get("/api/wallet")
 async def wallet_endpoint():
-    wb = latest_wallet_balance()
+    wb = fetch_wallet_rpc() or latest_wallet_balance()
     if not wb:
-        return {"available": False}
-    return {"available": True, **wb}
+        return {"available": False, "has_api_key": bool(HELIUS_API_KEY)}
+    return {"available": True, "has_api_key": bool(HELIUS_API_KEY), **wb}
 
 @app.get("/api/candidates")
 async def candidates():

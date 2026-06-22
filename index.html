@@ -259,6 +259,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
   .mob-head{display:block}
   .mn{padding:12px;padding-bottom:80px}
   .stat-session{display:none}
+  .stat-session-always{display:block}
   .stats{grid-template-columns:repeat(3,1fr)}
   .stat{padding:10px 10px}
   .stat-l{font-size:9px}
@@ -588,18 +589,37 @@ function renderStats(d){
   const eq=d.total_equity_usd;
   const posVal=d.positions_value_usd||0;
   const rentVal=d.rent_usd||0;
-  const eqVal=eq!=null?'$'+f(eq):(wb&&wb.total_usd!=null?'$'+f(wb.total_usd):'—');
-  const eqSub=wb&&wb.total_usd!=null?'$'+f(wb.total_usd)+' + $'+f(posVal)+' pos + $'+f(rentVal)+' rent':'no balance data';
-  const eqTitle=(wb&&wb.as_of?'wallet as of '+ago(wb.as_of)+' · ':'')+'rent est. '+f(d.rent_sol,3)+' SOL/pos';
-  $('#statRow').innerHTML=`
+  const hasWallet=d.has_helius_key;
+  
+  // Net Worth — show if wallet balance available OR positions exist
+  let eqVal, eqSub, eqTitle;
+  if(hasWallet && wb && wb.total_usd!=null){
+    eqVal='$'+f(eq||(wb.total_usd+posVal+(rentVal||0)));
+    eqSub='$'+f(wb.total_usd)+' wallet + $'+f(posVal)+' pos + $'+f(rentVal)+' rent';
+    eqTitle=(wb.as_of?'wallet as of '+ago(wb.as_of)+' · ':'')+'rent est. '+f(d.rent_sol,3)+' SOL/pos';
+  } else if(posVal>0){
+    eqVal='$'+f(posVal);
+    eqSub='$'+f(posVal)+' in positions';
+    eqTitle='no wallet balance data';
+  } else {
+    eqVal='—';
+    eqSub='no balance data';
+    eqTitle='';
+  }
+
+  // Session stat — always visible on mobile when wallet is hidden
+  const sessionClass=hasWallet?'stat stat-session':'stat stat-session-always';
+
+  let statsHtml=`
     <div class="stat" title="${eqTitle}"><div class="stat-l">Net Worth</div><div class="stat-v grn">${eqVal}</div><div class="stat-sub">${eqSub}</div></div>
     <div class="stat"><div class="stat-l">Open</div><div class="stat-v blue">${d.position_count}/${d.max_positions}</div><div class="stat-sub">positions active</div></div>
     <div class="stat"><div class="stat-l">Unrealized PnL</div><div class="stat-v ${unrColor}">${usd(unrealized)}</div><div class="stat-sub">open positions</div></div>
     <div class="stat"><div class="stat-l">Unclaimed Fees</div><div class="stat-v cyan">$${f(unclaimed,4)}</div><div class="stat-sub">pending claim</div></div>
     <div class="stat"><div class="stat-l">Net PnL</div><div class="stat-v ${pnlColor}">${usd(pnl)}</div><div class="stat-sub">${d.total_trades} trades closed</div></div>
     <div class="stat"><div class="stat-l">Fees Earned</div><div class="stat-v grn">$${f(d.total_fees,4)}</div><div class="stat-sub">LP yield collected</div></div>
-    <div class="stat stat-session"><div class="stat-l">Session</div><div class="stat-v cyan">${session}</div><div class="stat-sub">agent uptime</div></div>
+    <div class="${sessionClass}"><div class="stat-l">Session</div><div class="stat-v cyan">${session}</div><div class="stat-sub">agent uptime</div></div>
   `;
+  $('#statRow').innerHTML=statsHtml;
 }
 
 function renderChart(daily){
@@ -1052,7 +1072,7 @@ function renderPg(){
 function goPg(n){pgCur=Math.max(1,Math.min(n,Math.ceil(allH.length/pgSz)));renderTbl();}
 
 load();
-setInterval(load,30000);
+setInterval(load,60000);
 
 // ═══ MOBILE NAV ═══
 const mobPages=[
