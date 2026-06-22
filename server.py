@@ -25,6 +25,13 @@ if _meridian_env.exists():
     except:
         pass
 
+DASHBOARD_CONFIG = Path(__file__).parent / "dashboard-config.json"
+
+def load_dashboard_config():
+    if DASHBOARD_CONFIG.exists():
+        return json.loads(DASHBOARD_CONFIG.read_text())
+    return {"wallet_rpc_enabled": False}
+
 def load(fn):
     fp = MERIDIAN / fn
     if not fp.exists(): return {}
@@ -95,7 +102,8 @@ def latest_wallet_balance():
 def fetch_wallet_rpc():
     """Fetch wallet balance directly via Helius RPC API.
     Returns SOL balance, SOL price, and token accounts."""
-    if not HELIUS_API_KEY:
+    config = load_dashboard_config()
+    if not config.get("wallet_rpc_enabled", False) or not HELIUS_API_KEY:
         return None
 
     # Derive wallet address from state or config
@@ -339,7 +347,9 @@ async def dashboard():
     )[:15]
 
     # Wallet balance — prefer RPC (live), fallback to logs
-    wb = fetch_wallet_rpc() or latest_wallet_balance()
+    dc = load_dashboard_config()
+    rpc_enabled = dc.get("wallet_rpc_enabled", False) and bool(HELIUS_API_KEY)
+    wb = fetch_wallet_rpc() if rpc_enabled else None
     wallet_balance = None
     if wb:
         wallet_balance = {
@@ -372,7 +382,7 @@ async def dashboard():
     
     # Rent: query on-chain via Helius RPC for each position
     rent_sol_total = 0
-    if HELIUS_API_KEY:
+    if rpc_enabled:
         for p in active:
             pos_addr = p.get("address")
             if not pos_addr:
@@ -407,6 +417,7 @@ async def dashboard():
         "wallet": (wallet[:6] + "..." + wallet[-4:]) if wallet else "—",
         "wallet_full": wallet,
         "has_helius_key": bool(HELIUS_API_KEY),
+        "wallet_rpc_enabled": rpc_enabled,
         "positions": active,
         "position_count": len(active),
         "max_positions": config.get("maxPositions", 2),
@@ -446,6 +457,20 @@ async def wallet_endpoint():
     if not wb:
         return {"available": False, "has_api_key": bool(HELIUS_API_KEY)}
     return {"available": True, "has_api_key": bool(HELIUS_API_KEY), **wb}
+
+@app.get("/api/config")
+async def get_config():
+    config = load_dashboard_config()
+    config["has_helius_key"] = bool(HELIUS_API_KEY)
+    return config
+
+@app.patch("/api/config")
+async def update_config(body: dict):
+    config = load_dashboard_config()
+    if "wallet_rpc_enabled" in body:
+        config["wallet_rpc_enabled"] = bool(body["wallet_rpc_enabled"])
+    DASHBOARD_CONFIG.write_text(json.dumps(config, indent=2))
+    return {"ok": True, **config}
 
 @app.get("/api/candidates")
 async def candidates():

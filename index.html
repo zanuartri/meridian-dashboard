@@ -589,7 +589,7 @@ function renderStats(d){
   const eq=d.total_equity_usd;
   const posVal=d.positions_value_usd||0;
   const rentVal=d.rent_usd||0;
-  const hasWallet=d.has_helius_key;
+  const hasWallet=d.wallet_rpc_enabled && d.has_helius_key;
   
   // Net Worth — show if wallet balance available OR positions exist
   let eqVal, eqSub, eqTitle;
