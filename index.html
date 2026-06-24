@@ -657,7 +657,7 @@ function renderStats(d){
     <div class="stat"><div class="stat-l">Avg Win</div><div class="stat-v grn">$${f(aw)}</div><div class="stat-sub">per win</div></div>
     <div class="stat"><div class="stat-l">Avg Loss</div><div class="stat-v red">${usd(al)}</div><div class="stat-sub">per loss</div></div>
     <div class="stat"><div class="stat-l">Real PnL</div><div class="stat-v ${realPnlColor}">${usd(realPnl)}</div><div class="stat-sub">SOL gains @ today</div></div>
-    <div class="stat"><div class="stat-l">Portfolio</div><div class="stat-v ${portColor}">${portfolioUsd!=null?usd(portfolioUsd):'—'}</div><div class="stat-sub">${portfolioSol!=null?sol(portfolioSol):'wallet vs deposit'}${depCount>0?' · '+depCount+' deposit':''}</div></div>
+    <div class="stat"><div class="stat-l">Portfolio</div><div class="stat-v ${portColor}">${portfolioUsd!=null?usd(portfolioUsd):'—'}</div><div class="stat-sub">${depCount>0?depCount+' deposit':''}</div></div>
   `;
   $('#statRow').innerHTML=statsHtml;
 }
