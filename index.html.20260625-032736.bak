@@ -56,13 +56,13 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
 .term-pill.warn{border-color:var(--orange);color:var(--orange);background:var(--orange-bg)}
 
 /* ═══ STAT STRIP ═══ */
-.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:16px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:16px}
 .stat{background:var(--bg2);padding:12px 14px}
 .stat-l{font-family:var(--mono);font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
 .stat-v{font-family:var(--mono);font-size:22px;font-weight:700;line-height:1}
 .stat-v.grn{color:var(--grn)}.stat-v.red{color:var(--red)}.stat-v.blue{color:var(--blue)}.stat-v.org{color:var(--orange)}.stat-v.cyan{color:var(--cyan)}.stat-v.pur{color:var(--purple)}
 .cfg-val.grn,.trade-pair .grn{color:var(--grn)}.cfg-val.red,.trade-pair .red{color:var(--red)}.cfg-val.blue,.trade-pair .blue{color:var(--blue)}.cfg-val.cyan,.trade-pair .cyan{color:var(--cyan)}.cfg-val.warn{color:var(--orange)}
-.stat-sub{font-family:var(--mono);font-size:10px;color:var(--t4);margin-top:4px;white-space:nowrap}
+.stat-sub{font-family:var(--mono);font-size:11px;color:var(--t4);margin-top:4px;white-space:nowrap}
 .econ-head{display:flex;justify-content:space-between;align-items:center;margin:0 0 8px;gap:8px}
 .econ-head h3{font-family:var(--mono);font-size:10px;font-weight:500;color:var(--t3);text-transform:uppercase;letter-spacing:.5px}
 .econ-help-btn{font-family:var(--mono);font-size:11px;color:var(--t3);background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:4px 10px;cursor:pointer;white-space:nowrap;position:relative}
@@ -399,14 +399,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
       <div class="stats" id="statRow"></div>
       <div class="chart-grid">
         <div class="chart-box">
-          <h3 style="display:flex;justify-content:space-between;align-items:center">
-            <span>Performance Trend <span style="color:var(--t4)" id="chTag">—</span></span>
-            <span style="display:flex;gap:2px">
-              <span class="term-pill on" onclick="setPerfView('usd')" id="perfUsd" style="font-size:9px;padding:2px 6px;cursor:pointer">$</span>
-              <span class="term-pill" onclick="setPerfView('sol')" id="perfSol" style="font-size:9px;padding:2px 6px;cursor:pointer">◎</span>
-              <span class="term-pill" onclick="setPerfView('both')" id="perfBoth" style="font-size:9px;padding:2px 6px;cursor:pointer">Both</span>
-            </span>
-          </h3>
+          <h3>Performance Trend <span style="color:var(--t4)" id="chTag">—</span></h3>
           <div class="chart-wrap"><canvas id="perfChart"></canvas></div>
         </div>
         <div class="chart-box">
@@ -578,7 +571,7 @@ const tm=m=>{if(!m)return'—';m=Math.round(m);return m<60?m+'m':(m/60).toFixed(
 const cc=n=>n>0?'w':n<0?'l':'z';
 
 let allH=[],pgSz=15,pgCur=1,data=null,curPage='overview';
-let dailyView='usd',calView='usd',perfView='usd';
+let dailyView='usd',calView='usd';
 let charts={};
 
 function setDailyView(v){
@@ -593,13 +586,6 @@ function setCalView(v){
   document.getElementById('calSol').classList.toggle('on',v==='sol');
   renderCalendar();
   renderCalPositions();
-}
-function setPerfView(v){
-  perfView=v;
-  document.getElementById('perfUsd').classList.toggle('on',v==='usd');
-  document.getElementById('perfSol').classList.toggle('on',v==='sol');
-  document.getElementById('perfBoth').classList.toggle('on',v==='both');
-  if(data&&data.daily)renderChart(data.daily);
 }
 
 async function fj(p){try{return(await fetch(p)).json()}catch{return null}}
@@ -686,17 +672,10 @@ function renderChart(daily){
   const lineColor=lastVal>=0?'#00e676':'#ff5252';
   const lineColorSol=lastValSol>=0?'#448aff':'#ff9100';
   const gc='#252525',tc='#666';
-  const showUsd=perfView==='usd'||perfView==='both';
-  const showSol=perfView==='sol'||perfView==='both';
-  const datasets=[];
-  if(showUsd) datasets.push({label:'USD',data:cu,borderColor:lineColor,backgroundColor:ctx=>{const g=ctx.chart.ctx.createLinearGradient(0,0,0,200);g.addColorStop(0,lineColor==='#00e676'?'rgba(0,230,118,.1)':'rgba(255,82,82,.1)');g.addColorStop(1,'rgba(0,0,0,0)');return g},fill:true,tension:.3,pointRadius:2,borderWidth:2,pointBackgroundColor:lineColor,pointBorderColor:'#141414',pointBorderWidth:1.5});
-  if(showSol) datasets.push({label:'SOL',data:cuSol,borderColor:lineColorSol,backgroundColor:showUsd?'transparent':ctx=>{const g=ctx.chart.ctx.createLinearGradient(0,0,0,200);g.addColorStop(0,lineColorSol==='#448aff'?'rgba(68,138,255,.1)':'rgba(255,145,0,.1)');g.addColorStop(1,'rgba(0,0,0,0)');return g},fill:!showUsd,tension:.3,pointRadius:2,borderWidth:2,borderDash:showUsd?[4,2]:[],pointBackgroundColor:lineColorSol,pointBorderColor:'#141414',pointBorderWidth:1.5,yAxisID:showUsd?'y1':'y'});
-  const yFmt=showUsd&&!showSol?v=>'$'+v.toFixed(2):showSol&&!showUsd?v=>v.toFixed(4)+' SOL':v=>v.toFixed(2);
-  const o={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:datasets.length>1,labels:{color:'#999',font:{family:'JetBrains Mono',size:10},boxWidth:12,padding:8}},tooltip:{backgroundColor:'#1a1a1a',titleFont:{family:'JetBrains Mono',weight:'600',size:11},bodyFont:{family:'JetBrains Mono',size:11},padding:8,borderColor:'#333',borderWidth:1,displayColors:true}},scales:{x:{grid:{color:gc,drawBorder:false},ticks:{color:tc,font:{family:'JetBrains Mono',size:10}}},y:{grid:{color:gc,drawBorder:false},ticks:{color:tc,font:{family:'JetBrains Mono',size:10},callback:yFmt}}}};
-  if(showUsd&&showSol) o.scales.y1={position:'right',grid:{drawOnChartArea:false},ticks:{color:lineColorSol,font:{family:'JetBrains Mono',size:10},callback:v=>v.toFixed(4)+' SOL'}};
+  const o={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,labels:{color:'#999',font:{family:'JetBrains Mono',size:10},boxWidth:12,padding:8}},tooltip:{backgroundColor:'#1a1a1a',titleFont:{family:'JetBrains Mono',weight:'600',size:11},bodyFont:{family:'JetBrains Mono',size:11},padding:8,borderColor:'#333',borderWidth:1,displayColors:true}},scales:{x:{grid:{color:gc,drawBorder:false},ticks:{color:tc,font:{family:'JetBrains Mono',size:10}}},y:{grid:{color:gc,drawBorder:false},ticks:{color:tc,font:{family:'JetBrains Mono',size:10},callback:v=>v.toFixed(2)}}}};
   $('#chTag').textContent=daily[daily.length-1]?.trades+' trades';
   if(charts.perf)charts.perf.destroy();
-  charts.perf=new Chart($('#perfChart'),{type:'line',data:{labels:lb,datasets},options:o});
+  charts.perf=new Chart($('#perfChart'),{type:'line',data:{labels:lb,datasets:[{label:'USD',data:cu,borderColor:lineColor,backgroundColor:ctx=>{const g=ctx.chart.ctx.createLinearGradient(0,0,0,200);g.addColorStop(0,lineColor==='#00e676'?'rgba(0,230,118,.1)':'rgba(255,82,82,.1)');g.addColorStop(1,'rgba(0,0,0,0)');return g},fill:true,tension:.3,pointRadius:2,borderWidth:2,pointBackgroundColor:lineColor,pointBorderColor:'#141414',pointBorderWidth:1.5},{label:'SOL',data:cuSol,borderColor:lineColorSol,backgroundColor:'transparent',fill:false,tension:.3,pointRadius:1.5,borderWidth:1.5,borderDash:[4,2],pointBackgroundColor:lineColorSol,pointBorderColor:'#141414',pointBorderWidth:1,yAxisID:'y1'}]},options:{...o,scales:{...o.scales,y1:{position:'right',grid:{drawOnChartArea:false},ticks:{color:lineColorSol,font:{family:'JetBrains Mono',size:10},callback:v=>v.toFixed(4)+' SOL'}}}}});
 }
 
 function renderDailyChart(daily){
@@ -990,9 +969,8 @@ async function loadPoolCandidates(){
   const updatedAt=d.updatedAt;
   
   // Stats from candidates
-  const totalVol=candidates.reduce((a,c)=>a+(c.volume_window||c.volume_24h||c.volume||0),0);
-  const orgVals=candidates.map(c=>c.organic_score??c.organic??(c.base&&c.base.organic)).filter(v=>v!=null);
-  const avgOrganic=orgVals.length?orgVals.reduce((a,v)=>a+v,0)/orgVals.length:null;
+  const totalVol=candidates.reduce((a,c)=>a+(c.volume_window||c.volume_24h||0),0);
+  const avgOrganic=candidates.length?candidates.reduce((a,c)=>a+(c.organic_score||0),0)/candidates.length:0;
   const avgFeeTvl=candidates.length?candidates.reduce((a,c)=>a+(c.fee_active_tvl_ratio||c.fee_tvl_ratio||0),0)/candidates.length:0;
   
   const timeAgo=updatedAt?ago(updatedAt):'never';
@@ -1000,7 +978,7 @@ async function loadPoolCandidates(){
   $('#candPoolStats').innerHTML=`
     <div class="stat"><div class="stat-l">Candidates</div><div class="stat-v">${total}</div><div class="stat-sub">last scan ${timeAgo}</div></div>
     <div class="stat"><div class="stat-l">Total Volume</div><div class="stat-v">$${fmtK(totalVol)}</div></div>
-    <div class="stat"><div class="stat-l">Avg Organic</div><div class="stat-v ${avgOrganic==null?'':(avgOrganic>=60?'grn':'red')}">${avgOrganic==null?'—':avgOrganic.toFixed(0)}</div></div>
+    <div class="stat"><div class="stat-l">Avg Organic</div><div class="stat-v ${avgOrganic>=60?'grn':'red'}">${avgOrganic.toFixed(0)}</div></div>
     <div class="stat"><div class="stat-l">Avg Fee/TVL</div><div class="stat-v ${avgFeeTvl>=0.05?'grn':'red'}">${(avgFeeTvl*100).toFixed(2)}%</div></div>
   `;
   $('#candCount').textContent=total+' candidates';
@@ -1008,21 +986,21 @@ async function loadPoolCandidates(){
   // Table
   if(!candidates.length){$('#candPoolTbl').innerHTML='<div style="padding:24px;text-align:center;color:var(--t4);font-family:var(--mono);font-size:11px">No cached candidates yet. Run /screen in Meridian.</div>';return;}
   
-  let h='<table><thead><tr><th>Pool</th><th style="text-align:center">Volume</th><th style="text-align:center">Organic</th><th style="text-align:center">Fee/TVL</th><th style="text-align:center">Active%</th><th style="text-align:center">Holders</th><th style="text-align:center">Source</th></tr></thead><tbody>';
+  let h='<table><thead><tr><th>Pool</th><th>Volume</th><th>Organic</th><th>Fee/TVL</th><th>Active%</th><th>Holders</th><th>Source</th></tr></thead><tbody>';
   for(const c of candidates){
     const name=c.pool_name||c.name||c.base_mint?.slice(0,6)+'?'||'?';
-    const vol=c.volume_window||c.volume_24h||c.volume||0;
-    const organic=c.organic_score??c.organic??(c.base&&c.base.organic);
+    const vol=c.volume_window||c.volume_24h||0;
+    const organic=c.organic_score||0;
     const feeTvl=c.fee_active_tvl_ratio||c.fee_tvl_ratio||0;
-    const active=c.active_pct;
+    const active=c.active_pct||0;
     const holders=c.holder_count||c.holders||0;
     const src=c.source||(c.gmgn?'GMGN':'Meteora');
     h+=`<tr>
       <td class="pn" style="white-space:nowrap"><a href="https://app.meteora.ag/dlmm/${c.pool_address||c.pool||''}" target="_blank" style="color:var(--tx);text-decoration:none">${name}</a></td>
       <td style="text-align:center">$${fmtK(vol)}</td>
-      <td style="text-align:center" class="${organic==null?'':(organic>=60?'grn':'red')}">${organic==null?'—':organic}</td>
+      <td style="text-align:center" class="${organic>=60?'grn':'red'}">${organic}</td>
       <td style="text-align:center" class="${feeTvl>=0.05?'grn':'red'}">${(feeTvl*100).toFixed(2)}%</td>
-      <td style="text-align:center">${active==null?'—':active+'%'}</td>
+      <td style="text-align:center">${active}%</td>
       <td style="text-align:center">${holders}</td>
       <td style="text-align:center;color:var(--t3)">${src}</td>
     </tr>`;
