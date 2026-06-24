@@ -342,7 +342,7 @@ def fetch_deposits():
                 all_sigs.extend(batch)
                 before_sig = batch[-1].get("signature")
                 print(f"[Deposits] Backfill: {len(all_sigs)} signatures scanned...")
-                time.sleep(0.2)  # Rate limit
+                time.sleep(0.5)  # Rate limit: stay under 500 CU/s
             sigs = all_sigs
             print(f"[Deposits] Backfill complete: {len(sigs)} total signatures")
         else:
@@ -432,7 +432,7 @@ def fetch_deposits():
                             "from": "on-chain",
                         })
 
-                time.sleep(0.15)  # Rate limit: ~6 req/s
+                time.sleep(0.5)  # Rate limit: stay under 500 CU/s with Meridian agent
             except Exception as e:
                 print(f"[Deposits] TX fetch error for {sig[:12]}: {e}")
                 continue
