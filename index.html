@@ -639,6 +639,7 @@ function renderStats(d){
   const depAvg=ds.avg_price||0;
   const depCount=ds.count||0;
   const portfolioSol=d.portfolio_pnl_sol;
+  const portfolioTotal=d.portfolio_total_usd;
   const portfolioUsd=d.portfolio_pnl_usd;
   const pnlColor=pnl>=0?'grn':'red';
   const unrColor=unrealized>=0?'grn':'red';
@@ -657,7 +658,7 @@ function renderStats(d){
     <div class="stat"><div class="stat-l">Avg Win</div><div class="stat-v grn">$${f(aw)}</div><div class="stat-sub">per win</div></div>
     <div class="stat"><div class="stat-l">Avg Loss</div><div class="stat-v red">${usd(al)}</div><div class="stat-sub">per loss</div></div>
     <div class="stat"><div class="stat-l">Real PnL</div><div class="stat-v ${realPnlColor}">${usd(realPnl)}</div><div class="stat-sub">SOL gains @ today</div></div>
-    <div class="stat"><div class="stat-l">Portfolio</div><div class="stat-v ${portColor}">${portfolioUsd!=null?usd(portfolioUsd):'—'}</div><div class="stat-sub">${depCount>0?depCount+' deposit':''}</div></div>
+    <div class="stat"><div class="stat-l">Portfolio</div><div class="stat-v ${portColor}">${portfolioUsd!=null?usd(portfolioUsd):'—'}</div><div class="stat-sub">${portfolioTotal!=null?'$'+f(portfolioTotal):''}</div></div>
   `;
   $('#statRow').innerHTML=statsHtml;
 }

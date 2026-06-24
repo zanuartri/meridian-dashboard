@@ -772,6 +772,7 @@ async def dashboard():
     # "current SOL" = wallet SOL + open positions (in SOL) + token holdings (in SOL) + rent (in SOL)
     portfolio_pnl_sol = None
     portfolio_pnl_usd = None
+    portfolio_total_usd = None
     if deposit_stats and deposit_stats.get("total_sol", 0) > 0 and wallet:
         current_sol = 0
         if wallet_balance and wallet_balance.get("sol"):
@@ -818,6 +819,7 @@ async def dashboard():
             current_usd = round(current_sol * sol_price_for_pnl, 2) if sol_price_for_pnl else 0
             portfolio_pnl_usd = round(current_usd - deposited_usd, 2)
             portfolio_pnl_sol = round(portfolio_pnl_usd / sol_price_for_pnl, 6) if sol_price_for_pnl else None
+            portfolio_total_usd = current_usd
 
     # Active dev-mint cooldowns + blocklist
     cooldowns = active_cooldowns(pool_mem)
@@ -849,6 +851,7 @@ async def dashboard():
         "deposit_stats": deposit_stats,
         "portfolio_pnl_sol": portfolio_pnl_sol,
         "portfolio_pnl_usd": portfolio_pnl_usd,
+        "portfolio_total_usd": portfolio_total_usd if portfolio_total_usd else None,
          "real_pnl_usd": fmt(real_pnl_usd, 2),
         "total_sol_deposited": fmt(total_sol_deposited, 4),
         "avg_deposit_price": fmt(avg_deposit_price, 2),
