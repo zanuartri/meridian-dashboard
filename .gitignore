@@ -4,3 +4,4 @@ __pycache__/
 .env
 dashboard-config.json
 deposits.json
+*.bak
