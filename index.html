@@ -635,12 +635,12 @@ function renderStats(d){
   let statsHtml=`
     <div class="stat"><div class="stat-l">Open</div><div class="stat-v blue">${d.position_count}/${d.max_positions}</div><div class="stat-sub">positions</div></div>
     <div class="stat"><div class="stat-l">Unrealized</div><div class="stat-v ${unrColor}">${usd(unrealized)}</div><div class="stat-sub">${sol(unrealizedSol)}</div></div>
-    <div class="stat"><div class="stat-l">Unclaimed</div><div class="stat-v cyan">$${f(unclaimed,4)}</div><div class="stat-sub">${f(unclaimedSol,6)} SOL</div></div>
+    <div class="stat"><div class="stat-l">Unclaimed</div><div class="stat-v cyan">$$${f(unclaimed,2)}</div><div class="stat-sub">${f(unclaimedSol,6)} SOL</div></div>
     <div class="stat"><div class="stat-l">Net PnL</div><div class="stat-v ${pnlColor}">${usd(pnl)}</div><div class="stat-sub">${sol(pnlSol)}</div></div>
     <div class="stat"><div class="stat-l">Avg Win</div><div class="stat-v grn">$${f(aw)}</div><div class="stat-sub">per win</div></div>
     <div class="stat"><div class="stat-l">Avg Loss</div><div class="stat-v red">${usd(al)}</div><div class="stat-sub">per loss</div></div>
     <div class="stat"><div class="stat-l">Real PnL</div><div class="stat-v ${realPnlColor}">${usd(realPnl)}</div><div class="stat-sub">SOL gains @ today</div></div>
-    <div class="stat"><div class="stat-l">Portfolio</div><div class="stat-v ${portColor}">${portfolioUsd!=null?usd(portfolioUsd):'—'}</div><div class="stat-sub">${portfolioSol!=null?sol(portfolioSol):'wallet vs deposit'}${depCount>0?' · '+depCount+' dep':''}</div></div>
+    <div class="stat"><div class="stat-l">Portfolio</div><div class="stat-v ${portColor}">${portfolioUsd!=null?usd(portfolioUsd):'—'}</div><div class="stat-sub">${portfolioSol!=null?sol(portfolioSol):'wallet vs deposit'}${depCount>0?' · '+depCount+' deposit':''}</div></div>
   `;
   $('#statRow').innerHTML=statsHtml;
 }
@@ -734,7 +734,7 @@ function renderPositions(positions){
     const rangeW=(p.bins_below||0)*(p.bin_step||100)/100;
     const oor=!!p.out_of_range_since;
     return `<div class="pos-card">
-      <div class="pos-status ${oor?'down':'neutral'}"><span class="dir">${oor?'OOR':'HOLDING'}</span><span class="held">${hold}</span></div>
+      <div class="pos-status ${oor?'down':'neutral'}"><span class="dir">${oor?'OOR':'IN RANGE'}</span><span class="held">${hold}</span></div>
       <div class="pos-body">
         <div class="pos-name">${p.pair}</div>
         <div class="pos-addr">${p.address}</div>
@@ -742,7 +742,7 @@ function renderPositions(positions){
         <div class="pos-row"><span class="k">Value</span><span class="v">${p.total_value_usd!=null?'$'+f(p.total_value_usd):'—'}${p.total_value_sol!=null?' ('+f(p.total_value_sol,6)+' SOL)':''}</span></div>
         <div class="pos-row"><span class="k">Unrealized PnL</span><span class="v ${p.unrealized_pnl_usd>=0?'grn':'red'}">${p.unrealized_pnl_usd!=null?usd(p.unrealized_pnl_usd):'—'}${p.unrealized_pnl_pct!=null?` (${p.unrealized_pnl_pct>=0?'+':''}${f(p.unrealized_pnl_pct)}%)`:''}</span></div>
         ${p.unrealized_pnl_sol!=null?`<div class="pos-row"><span class="k">PnL (SOL)</span><span class="v ${p.unrealized_pnl_sol>=0?'grn':'red'}">${sol(p.unrealized_pnl_sol)}</span></div>`:''}
-        <div class="pos-row"><span class="k">Unclaimed Fees</span><span class="v cyan">${p.unclaimed_fees_usd!=null?'$'+f(p.unclaimed_fees_usd,4):'—'}${p.unclaimed_fees_sol!=null?' ('+f(p.unclaimed_fees_sol,6)+' SOL)':''}</span></div>
+        <div class="pos-row"><span class="k">Unclaimed Fees</span><span class="v cyan">${p.unclaimed_fees_usd!=null?'$'+f(p.unclaimed_fees_usd,2):'—'}${p.unclaimed_fees_sol!=null?' ('+f(p.unclaimed_fees_sol,6)+' SOL)':''}</span></div>
         <div class="pos-row"><span class="k">Range</span><span class="v">${p.bins_below}d × ${p.bin_step} step = ${rangeW.toFixed(0)}%</span></div>
         <div class="pos-row"><span class="k">Organic</span><span class="v">${p.organic_score||'—'}/100</span></div>
         <div class="pos-row"><span class="k">Deployed</span><span class="v">${dep}</span></div>
@@ -784,7 +784,7 @@ function renderRecentTrades(history){
     const feesSol=t.fees_sol||0;
     const dt=t.recorded_at?new Date(t.recorded_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
     const r=(t.close_reason||'—');const sr=r.length>20?r.slice(0,20)+'…':r;
-    return `<div class="trade-item"><div class="trade-info"><div class="trade-pair">${t.pool_name||'—'}</div><div class="trade-meta">${tm(t.minutes_held)} • ${sr} • ${dt}</div></div><div><div class="trade-pnl ${pnl>=0?'grn':'red'}">${usd(pnl)} <span style="font-size:10px;opacity:.7">${pnlSol>=0?'+':''}${pnlSol.toFixed(6)}</span></div><div class="trade-pnl-sub">${pct>=0?'+':''}${f(pct)}% • fees ${f(feesSol,6)} SOL</div></div></div>`;
+    return `<div class="trade-item"><div class="trade-info"><div class="trade-pair">${t.pool_name||'—'}</div><div class="trade-meta">${tm(t.minutes_held)} • ${sr} • ${dt}</div></div><div><div class="trade-pnl ${pnl>=0?'grn':'red'}">${usd(pnl)} <span style="font-size:10px;opacity:.7">${pnlSol>=0?'+':''}${pnlSol.toFixed(4)} SOL</span></div><div class="trade-pnl-sub">${pct>=0?'+':''}${f(pct)}% • fees ${f(feesSol,6)} SOL</div></div></div>`;
   }).join('');
 }
 
