@@ -652,7 +652,7 @@ function renderStats(d){
   let statsHtml=`
     <div class="stat"><div class="stat-l">Open</div><div class="stat-v blue">${d.position_count}/${d.max_positions}</div><div class="stat-sub">positions</div></div>
     <div class="stat"><div class="stat-l">Unrealized</div><div class="stat-v ${unrColor}">${usd(unrealized)}</div><div class="stat-sub">${sol(unrealizedSol)}</div></div>
-    <div class="stat"><div class="stat-l">Unclaimed</div><div class="stat-v cyan">$$${f(unclaimed,2)}</div><div class="stat-sub">${f(unclaimedSol,6)} SOL</div></div>
+    <div class="stat"><div class="stat-l">Unclaimed</div><div class="stat-v cyan">$${f(unclaimed,2)}</div><div class="stat-sub">${f(unclaimedSol,6)} SOL</div></div>
     <div class="stat"><div class="stat-l">Net PnL</div><div class="stat-v ${pnlColor}">${usd(pnl)}</div><div class="stat-sub">${sol(pnlSol)}</div></div>
     <div class="stat"><div class="stat-l">Avg Win</div><div class="stat-v grn">$${f(aw)}</div><div class="stat-sub">per win</div></div>
     <div class="stat"><div class="stat-l">Avg Loss</div><div class="stat-v red">${usd(al)}</div><div class="stat-sub">per loss</div></div>
