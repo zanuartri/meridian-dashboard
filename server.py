@@ -2,7 +2,7 @@
 Meridian Dashboard API — Charon-inspired dark terminal UI
 Read-only visualization of /root/meridian/ state files
 """
-import json, os, urllib.request, urllib.error
+import json, os, urllib.request, urllib.error, time
 from datetime import datetime, timezone
 from pathlib import Path
 from fastapi import FastAPI
@@ -14,6 +14,7 @@ WALLET = os.environ.get("MERIDIAN_WALLET", "")
 
 # Load Helius API key from Meridian .env
 HELIUS_API_KEY = ""
+ALCHEMY_API_KEY = ""
 _meridian_env = MERIDIAN / ".env"
 if _meridian_env.exists():
     try:
@@ -21,9 +22,24 @@ if _meridian_env.exists():
             line = line.strip()
             if line.startswith("HELIUS_API_KEY="):
                 HELIUS_API_KEY = line.split("=", 1)[1].strip().strip('"').strip("'")
-                break
+            if line.startswith("ALCHEMY_API_KEY="):
+                ALCHEMY_API_KEY = line.split("=", 1)[1].strip().strip('"').strip("'")
     except:
         pass
+# Fallback: check .env.bak for Alchemy key
+if not ALCHEMY_API_KEY:
+    _bak = MERIDIAN / ".env.bak"
+    if _bak.exists():
+        try:
+            import re
+            for line in _bak.read_text().splitlines():
+                if "WRITE_RPC_URLS" in line and "alchemy.com" in line:
+                    m = re.search(r'alchemy\.com/v2/([a-zA-Z0-9_-]+)', line)
+                    if m:
+                        ALCHEMY_API_KEY = m.group(1)
+                        break
+        except:
+            pass
 
 DASHBOARD_CONFIG = Path(__file__).parent / "dashboard-config.json"
 
@@ -222,6 +238,265 @@ def fetch_wallet_rpc():
         print(f"[RPC] Error fetching wallet balance: {e}")
         return None
 
+def get_sol_price():
+    """Fetch current SOL price from CoinGecko. Returns float or 0."""
+    try:
+        url = "https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd"
+        req = urllib.request.Request(url)
+        resp = urllib.request.urlopen(req, timeout=10)
+        data = json.loads(resp.read())
+        return float(data["solana"]["usd"])
+    except:
+        return 0
+DEPOSITS_FILE = MERIDIAN / "deposits.json"
+DEPOSIT_CACHE_TTL = 3600  # refresh at most once per hour
+
+def load_deposits_cache():
+    if DEPOSITS_FILE.exists():
+        try:
+            return json.loads(DEPOSITS_FILE.read_text())
+        except:
+            pass
+    return {"deposits": [], "last_sig": None, "last_fetch": 0, "stats": {}}
+
+def save_deposits_cache(cache):
+    try:
+        DEPOSITS_FILE.write_text(json.dumps(cache, indent=2))
+    except Exception as e:
+        print(f"[Deposits] Cache save error: {e}")
+
+def get_wallet_addr():
+    """Get wallet address from state.json or wallet balance logs."""
+    state = load("state.json")
+    w = state.get("owner", "") or state.get("wallet", "")
+    if not w:
+        wb = latest_wallet_balance()
+        if wb:
+            w = wb.get("wallet", "")
+    return w
+
+def fetch_historical_sol_price(date_str):
+    """Fetch SOL price for a specific date (DD-MM-YYYY format) from CoinGecko."""
+    try:
+        url = f"https://api.coingecko.com/api/v3/coins/solana/history?date={date_str}"
+        req = urllib.request.Request(url, headers={"User-Agent": "MeridianDashboard/1.0"})
+        resp = urllib.request.urlopen(req, timeout=10)
+        data = json.loads(resp.read())
+        return float(data.get("market_data", {}).get("current_price", {}).get("usd", 0))
+    except:
+        return 0
+
+def fetch_deposits():
+    """Fetch deposit history via Alchemy RPC (getSignaturesForAddress + getTransaction).
+    Detects incoming SOL transfers (not swaps/LP/claims).
+    Caches in deposits.json, refreshes at most once per hour.
+    API usage: ~1-2 Alchemy calls + ~N CoinGecko calls per refresh.
+    """
+    cache = load_deposits_cache()
+
+    # Rate limit: don't fetch more than once per hour
+    if time.time() - cache.get("last_fetch", 0) < DEPOSIT_CACHE_TTL:
+        return cache.get("stats", {})
+
+    wallet = get_wallet_addr()
+    if not wallet:
+        return cache.get("stats", {})
+
+    # Use Alchemy RPC (preferred) or Helius RPC fallback
+    if ALCHEMY_API_KEY:
+        rpc_url = f"https://solana-mainnet.g.alchemy.com/v2/{ALCHEMY_API_KEY}"
+        print(f"[Deposits] Using Alchemy RPC")
+    elif HELIUS_API_KEY:
+        rpc_url = f"https://mainnet.helius-rpc.com/?api-key={HELIUS_API_KEY}"
+        print(f"[Deposits] Using Helius RPC fallback")
+    else:
+        print(f"[Deposits] No RPC available (no Alchemy or Helius key)")
+        return cache.get("stats", {})
+
+    def rpc_call(method, params):
+        payload = json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": params}).encode()
+        req = urllib.request.Request(rpc_url, data=payload, headers={"Content-Type": "application/json"})
+        resp = urllib.request.urlopen(req, timeout=15)
+        return json.loads(resp.read())
+
+    try:
+        # Backfill mode: only on first run (empty cache)
+        has_cache = cache.get("last_sig") or len(cache.get("deposits", [])) > 0
+        is_backfill = not has_cache
+        MAX_BACKFILL_TXS = 500  # scan up to 500 txs on first run
+        BATCH_SIZE = 100
+        
+        all_sigs = []
+        before_sig = None
+        
+        if is_backfill:
+            print(f"[Deposits] Backfill mode: scanning up to {MAX_BACKFILL_TXS} transactions...")
+            while len(all_sigs) < MAX_BACKFILL_TXS:
+                params = [wallet, {"limit": BATCH_SIZE}]
+                if before_sig:
+                    params[1]["before"] = before_sig
+                result = rpc_call("getSignaturesForAddress", params)
+                batch = result.get("result", [])
+                if not batch:
+                    break
+                all_sigs.extend(batch)
+                before_sig = batch[-1].get("signature")
+                print(f"[Deposits] Backfill: {len(all_sigs)} signatures scanned...")
+                time.sleep(0.2)  # Rate limit
+            sigs = all_sigs
+            print(f"[Deposits] Backfill complete: {len(sigs)} total signatures")
+        else:
+            # Normal mode: only fetch new transactions
+            sig_params = [wallet, {"limit": BATCH_SIZE}]
+            if cache.get("last_sig"):
+                sig_params[1]["before"] = cache["last_sig"]
+            sig_result = rpc_call("getSignaturesForAddress", sig_params)
+            sigs = sig_result.get("result", [])
+
+        if not sigs:
+            cache["last_fetch"] = time.time()
+            save_deposits_cache(cache)
+            return cache.get("stats", {})
+
+        # Step 2: Get transaction details (batch of 5 to stay under rate limit)
+        existing_sigs = {d["sig"] for d in cache["deposits"]}
+        new_deposits = []
+
+        # Known programs to exclude (LP operations, swaps, DeFi interactions)
+        EXCLUDE_PROGRAMS = {
+            "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo",  # Meteora DLMM
+            "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",  # Jupiter v6
+            "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8",  # Raydium AMM
+            "DF1ow4tspfHX9JwWJsAb9epbkA8hmp",                # Meteora pool operations
+            "L2TExMFKdjpN9kozasaurPirfHy9P8",                # Meteora DLMM helper
+        }
+
+        for sig_obj in sigs:
+            sig = sig_obj.get("signature", "")
+            if sig in existing_sigs:
+                continue
+            if sig_obj.get("err"):  # Skip failed transactions
+                continue
+
+            # Get transaction details
+            try:
+                tx_result = rpc_call("getTransaction", [sig, {"encoding": "jsonParsed", "maxSupportedTransactionVersion": 0}])
+                tx = tx_result.get("result")
+                if not tx:
+                    continue
+
+                # Skip if transaction involves excluded programs (top-level or inner instructions)
+                accounts = [a.get("pubkey", "") if isinstance(a, dict) else str(a) for a in tx.get("transaction", {}).get("message", {}).get("accountKeys", [])]
+                meta_temp = tx.get("meta", {})
+                inner_programs = set()
+                for inner_group in meta_temp.get("innerInstructions", []):
+                    for inner_inst in inner_group.get("instructions", []):
+                        inner_programs.add(inner_inst.get("programId", ""))
+                all_programs = set(accounts) | inner_programs
+                if any(acc in EXCLUDE_PROGRAMS for acc in all_programs):
+                    continue
+
+                # Only count simple SOL transfers as deposits (not DeFi operations)
+                instructions = tx.get("transaction", {}).get("message", {}).get("instructions", [])
+                has_parsed_transfer = False
+                for inst in instructions:
+                    parsed = inst.get("parsed", {})
+                    if parsed and parsed.get("type") == "transfer":
+                        info = parsed.get("info", {})
+                        if info.get("destination") == wallet:
+                            has_parsed_transfer = True
+                            break
+                if not has_parsed_transfer:
+                    continue
+
+                # Check for incoming SOL via pre/postBalances
+                meta = tx.get("meta", {})
+                pre_balances = meta.get("preBalances", [])
+                post_balances = meta.get("postBalances", [])
+                account_keys = [a.get("pubkey", "") if isinstance(a, dict) else str(a) for a in tx.get("transaction", {}).get("message", {}).get("accountKeys", [])]
+
+                wallet_idx = None
+                for i, key in enumerate(account_keys):
+                    if key == wallet:
+                        wallet_idx = i
+                        break
+
+                if wallet_idx is not None and wallet_idx < len(pre_balances) and wallet_idx < len(post_balances):
+                    balance_change = (post_balances[wallet_idx] - pre_balances[wallet_idx]) / 1e9
+                    if balance_change >= 0.05:  # Minimum deposit threshold
+                        block_time = tx.get("blockTime", sig_obj.get("blockTime", 0))
+                        new_deposits.append({
+                            "sig": sig,
+                            "ts": block_time or 0,
+                            "amount_sol": round(balance_change, 6),
+                            "from": "on-chain",
+                        })
+
+                time.sleep(0.15)  # Rate limit: ~6 req/s
+            except Exception as e:
+                print(f"[Deposits] TX fetch error for {sig[:12]}: {e}")
+                continue
+
+
+
+        # Fetch historical SOL prices for new deposits (grouped by date)
+        dates_needed = set()
+        for dep in new_deposits:
+            dt = datetime.fromtimestamp(dep["ts"], tz=timezone.utc)
+            dates_needed.add(dt.strftime("%d-%m-%Y"))
+
+        # Load existing price cache from deposits
+        price_cache = {}
+        for dep in cache["deposits"]:
+            if dep.get("sol_price", 0) > 0:
+                dt = datetime.fromtimestamp(dep["ts"], tz=timezone.utc)
+                price_cache[dt.strftime("%d-%m-%Y")] = dep["sol_price"]
+
+        # Fetch missing prices (with rate limiting)
+        for date_str in dates_needed:
+            if date_str not in price_cache:
+                price = fetch_historical_sol_price(date_str)
+                if price > 0:
+                    price_cache[date_str] = price
+                time.sleep(2)  # CoinGecko rate limit: ~1 call per 2 seconds
+
+        # Add prices to new deposits
+        for dep in new_deposits:
+            dt = datetime.fromtimestamp(dep["ts"], tz=timezone.utc)
+            date_str = dt.strftime("%d-%m-%Y")
+            dep["sol_price"] = price_cache.get(date_str, 0)
+
+        # Update cache
+        cache["deposits"].extend(new_deposits)
+        if sigs:
+            cache["last_sig"] = sigs[0].get("signature", cache.get("last_sig"))
+        cache["last_fetch"] = time.time()
+
+        # Compute stats (weighted average deposit price)
+        deposits = cache["deposits"]
+        total_sol = sum(d.get("amount_sol", 0) for d in deposits)
+        weighted_usd = sum(
+            d.get("amount_sol", 0) * d.get("sol_price", 0)
+            for d in deposits if d.get("sol_price", 0) > 0
+        )
+        avg_price = weighted_usd / total_sol if total_sol > 0 else 0
+        with_price = sum(1 for d in deposits if d.get("sol_price", 0) > 0)
+
+        cache["stats"] = {
+            "total_sol": round(total_sol, 4),
+            "total_usd": round(weighted_usd, 2),
+            "avg_price": round(avg_price, 2),
+            "count": len(deposits),
+            "with_price": with_price,
+            "last_deposit_ts": deposits[-1]["ts"] if deposits else 0,
+        }
+
+        save_deposits_cache(cache)
+        return cache["stats"]
+    except Exception as e:
+        print(f"[Deposits] Error: {e}")
+        return cache.get("stats", {})
+
 def fmt(n, d=2):
     if n is None or n != n: return None
     return round(float(n), d)
@@ -240,11 +515,22 @@ async def dashboard():
     wallet = WALLET
     if not wallet:
         wallet = state.get("owner", "") or state.get("wallet", "")
+
+    # Deposit tracking — fetch from Helius if cached data is stale
+    deposit_stats = fetch_deposits()
+    
+    # Update wallet if still empty (found from deposit tracking logs)
+    if not wallet:
+        wallet = get_wallet_addr()
+
     # Active positions
     positions = state.get("positions", {})
     active = []
     total_unrealized = 0
     total_unclaimed_fees = 0
+    total_unrealized_sol = 0
+    total_unclaimed_fees_sol = 0
+    sol_price_for_pnl = get_sol_price()
     for addr, pos in positions.items():
         if not isinstance(pos, dict) or pos.get("closed"): continue
         br = pos.get("bin_range", {}) or {}
@@ -278,7 +564,16 @@ async def dashboard():
             "unclaimed_fees_usd": fmt(pos.get("last_unclaimed_fees_usd")),
             "total_value_usd": fmt(pos.get("last_total_value_usd")),
             "last_pnl_at": pos.get("last_pnl_at"),
+            "unrealized_pnl_sol": fmt(pos.get("amount_sol", 0) * (pos.get("last_pnl_pct", 0) or 0) / 100, 6) if pos.get("last_pnl_pct") else None,
+            "unclaimed_fees_sol": fmt((pos.get("last_unclaimed_fees_usd", 0) or 0) / sol_price_for_pnl, 6) if sol_price_for_pnl else None,
+            "total_value_sol": fmt(pos.get("amount_sol", 0) * (1 + (pos.get("last_pnl_pct", 0) or 0) / 100), 6) if pos.get("last_pnl_pct") is not None else pos.get("amount_sol"),
         })
+    # Compute SOL unrealized totals
+    for p in active:
+        if p.get("unrealized_pnl_sol") is not None:
+            total_unrealized_sol += p["unrealized_pnl_sol"]
+        if p.get("unclaimed_fees_sol") is not None:
+            total_unclaimed_fees_sol += p["unclaimed_fees_sol"]
 
     # Closed stats
     total_pnl = sum(p.get("pnl_usd", 0) for p in closed if isinstance(p, dict))
@@ -287,9 +582,48 @@ async def dashboard():
     win_rate = len(wins) / len(closed) * 100 if closed else 0
     avg_win = sum(p.get("pnl_pct", 0) for p in wins) / len(wins) if wins else 0
     avg_loss = sum(p.get("pnl_pct", 0) for p in losses) / len(losses) if losses else 0
-    total_fees = sum(p.get("fees_earned_usd", 0) for p in closed if isinstance(p, dict))
+    total_fees = sum(
+        (p.get("fee_pnl_usd") if p.get("fee_pnl_usd") is not None else p.get("fees_earned_usd", 0)) or 0
+        for p in closed if isinstance(p, dict)
+    )
+    # SOL-denominated closed stats
+    total_pnl_sol = sum(
+        (p.get("amount_sol", 0) or 0) * ((p.get("pnl_pct", 0) or 0) / 100)
+        for p in closed if isinstance(p, dict)
+    )
+    total_fees_sol = sum(
+        ((p.get("fee_pnl_usd") if p.get("fee_pnl_usd") is not None else p.get("fees_earned_usd", 0)) or 0)
+        / (p.get("initial_value_usd", 0) / p.get("amount_sol", 1) if p.get("amount_sol") else sol_price_for_pnl or 1)
+        for p in closed if isinstance(p, dict)
+    )
+    # Deposit tracking — real PnL accounting for SOL price changes
+    total_sol_deposited = sum((p.get("amount_sol", 0) or 0) for p in closed if isinstance(p, dict))
+    total_initial_usd = sum((p.get("initial_value_usd", 0) or 0) for p in closed if isinstance(p, dict))
+    avg_deposit_price = total_initial_usd / total_sol_deposited if total_sol_deposited else 0
+    sol_price_change_pct = ((sol_price_for_pnl - avg_deposit_price) / avg_deposit_price * 100) if avg_deposit_price and sol_price_for_pnl else 0
+    # Real PnL = SOL gains × current price (what your LP profits are worth TODAY)
+    real_pnl_usd = total_pnl_sol * sol_price_for_pnl if sol_price_for_pnl else 0
+    # vs Hold = if you just held the deposited SOL at current price vs actual outcome
+    # Actual: wallet has current_balance, LP gained total_pnl_sol
+    # Hold: would have total_sol_deposited × current_price
+    # Net effect: real_pnl_usd already captures this — it's the USD value of LP gains at today's price
+    # Price impact: how much SOL price dropped since avg deposit
     hold_times = [p.get("minutes_held", 0) for p in closed if p.get("minutes_held")]
     avg_hold = sum(hold_times) / len(hold_times) if hold_times else 0
+    # Fee-yield vs inventory-bleed (negative-skew objective; split data since Fase A)
+    split = [p for p in closed if isinstance(p, dict) and p.get("inventory_pnl_usd") is not None]
+    fee_pnl_total = sum((p.get("fee_pnl_usd") if p.get("fee_pnl_usd") is not None else p.get("fees_earned_usd", 0)) or 0 for p in split)
+    inventory_pnl_total = sum((p.get("inventory_pnl_usd") or 0) for p in split)
+    split_trades = len(split)
+    win_usd = [p.get("pnl_usd", 0) or 0 for p in wins]
+    loss_usd = [p.get("pnl_usd", 0) or 0 for p in losses if (p.get("pnl_usd", 0) or 0) < 0]
+    avg_win_usd = sum(win_usd) / len(win_usd) if win_usd else 0
+    avg_loss_usd = sum(loss_usd) / len(loss_usd) if loss_usd else 0
+    payoff_ratio = abs(avg_win_usd / avg_loss_usd) if avg_loss_usd else 0
+    expectancy = total_pnl / len(closed) if closed else 0
+    biggest_loss = min([p.get("pnl_usd", 0) or 0 for p in closed if isinstance(p, dict)], default=0)
+    biggest_win = max([p.get("pnl_usd", 0) or 0 for p in closed if isinstance(p, dict)], default=0)
+    fee_cover_pct = (fee_pnl_total / abs(inventory_pnl_total) * 100) if inventory_pnl_total < 0 else None
 
     # TP/SL stats
     tp_count = sum(1 for p in closed if "take profit" in (p.get("close_reason") or "").lower() or "trailing" in (p.get("close_reason") or "").lower())
@@ -303,19 +637,44 @@ async def dashboard():
         if not ts: continue
         day = ts[:10]
         if day not in daily:
-            daily[day] = {"date": day, "pnl_usd": 0, "trades": 0, "wins": 0, "fees": 0}
+            daily[day] = {"date": day, "pnl_usd": 0, "pnl_sol": 0, "trades": 0, "wins": 0, "fees": 0, "fees_sol": 0}
         daily[day]["pnl_usd"] += p.get("pnl_usd", 0) or 0
+        daily[day]["pnl_sol"] += (p.get("amount_sol", 0) or 0) * ((p.get("pnl_pct", 0) or 0) / 100)
         daily[day]["trades"] += 1
         daily[day]["fees"] += p.get("fees_earned_usd", 0) or 0
+        _deploy_sol = p.get("amount_sol", 0) or 0
+        _deploy_usd = p.get("initial_value_usd", 0) or 0
+        _sp_at_deploy = _deploy_usd / _deploy_sol if _deploy_sol else 0
+        daily[day]["fees_sol"] += (p.get("fees_earned_usd", 0) or 0) / (_sp_at_deploy or sol_price_for_pnl or 1)
         if (p.get("pnl_pct", 0) or 0) > 0: daily[day]["wins"] += 1
     days = sorted(daily.values(), key=lambda x: x["date"])
     cum = 0
+    cum_sol = 0
     for d in days:
         cum += d["pnl_usd"]
         d["cumulative"] = round(cum, 4)
+        cum_sol += d["pnl_sol"]
+        d["cumulative_sol"] = round(cum_sol, 6)
 
     # History (recent)
     history = sorted(closed, key=lambda x: x.get("recorded_at", ""), reverse=True)[:50]
+    # Add SOL PnL to history entries
+    for h in history:
+        if isinstance(h, dict):
+            _amt = h.get("amount_sol", 0) or 0
+            _pct = h.get("pnl_pct", 0) or 0
+            h["pnl_sol"] = round(_amt * _pct / 100, 6)
+            _iv = h.get("initial_value_usd", 0) or 0
+            _sp = _iv / _amt if _amt else 0
+            h["fees_sol"] = round((h.get("fees_earned_usd", 0) or 0) / (_sp or sol_price_for_pnl or 1), 6)
+            # Deposit SOL price tracking
+            h["sol_price_at_deploy"] = round(_sp, 2) if _sp else None
+            if _sp and sol_price_for_pnl:
+                h["sol_price_change_pct"] = round((sol_price_for_pnl - _sp) / _sp * 100, 1)
+            else:
+                h["sol_price_change_pct"] = None
+            # Real PnL for this trade at today's price
+            h["real_pnl_usd"] = round(_amt * _pct / 100 * sol_price_for_pnl, 4) if sol_price_for_pnl else None
 
     # Config — pass full config + computed fields
     config_summary = dict(config)
@@ -409,6 +768,54 @@ async def dashboard():
     if wallet_balance and wallet_balance.get("total_usd") is not None:
         total_equity = fmt(wallet_balance["total_usd"] + positions_value + (rent_usd or 0))
 
+    # Portfolio PnL from deposit tracking: current total portfolio vs total deposited
+    # "current SOL" = wallet SOL + open positions (in SOL) + token holdings (in SOL) + rent (in SOL)
+    portfolio_pnl_sol = None
+    portfolio_pnl_usd = None
+    if deposit_stats and deposit_stats.get("total_sol", 0) > 0 and wallet:
+        current_sol = 0
+        if wallet_balance and wallet_balance.get("sol"):
+            current_sol = wallet_balance["sol"]
+        elif ALCHEMY_API_KEY:
+            try:
+                rpc_url = f"https://solana-mainnet.g.alchemy.com/v2/{ALCHEMY_API_KEY}"
+                payload = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "getBalance", "params": [wallet]}).encode()
+                req = urllib.request.Request(rpc_url, data=payload, headers={"Content-Type": "application/json"})
+                resp = urllib.request.urlopen(req, timeout=10)
+                result = json.loads(resp.read())
+                current_sol = result.get("result", {}).get("value", 0) / 1e9
+            except:
+                pass
+        
+        # Add open positions value (convert USD → SOL)
+        if positions_value > 0 and sol_price_for_pnl:
+            current_sol += positions_value / sol_price_for_pnl
+        
+        # Add rent fees (SOL locked in rent)
+        if rent_sol_total > 0:
+            current_sol += rent_sol_total
+        
+        # Add token holdings value (convert USD → SOL)
+        if wallet_balance:
+            tokens_usd = 0
+            for t in wallet_balance.get("tokens", []):
+                try:
+                    tokens_usd += float(t.get("usd", 0) or 0)
+                except:
+                    pass
+            usdc = 0
+            try:
+                usdc = float(wallet_balance.get("usdc", 0) or 0)
+            except:
+                pass
+            tokens_sol = (tokens_usd + usdc) / sol_price_for_pnl if sol_price_for_pnl else 0
+            current_sol += tokens_sol
+        
+        if current_sol > 0:
+            total_deposited = deposit_stats.get("total_sol", 0)
+            portfolio_pnl_sol = round(current_sol - total_deposited, 6)
+            portfolio_pnl_usd = round(portfolio_pnl_sol * sol_price_for_pnl, 2) if sol_price_for_pnl else None
+
     # Active dev-mint cooldowns + blocklist
     cooldowns = active_cooldowns(pool_mem)
     blocklist_count = len(blocklist_entries())
@@ -431,7 +838,29 @@ async def dashboard():
         "unrealized_pnl_usd": fmt(total_unrealized),
         "unclaimed_fees_usd": fmt(total_unclaimed_fees),
         "total_fees": fmt(total_fees, 4),
+        "net_pnl_sol": fmt(total_pnl_sol, 6),
+        "unrealized_pnl_sol": fmt(total_unrealized_sol, 6),
+        "unclaimed_fees_sol": fmt(total_unclaimed_fees_sol, 6),
+        "total_fees_sol": fmt(total_fees_sol, 6),
+        "sol_price": fmt(sol_price_for_pnl),
+        "deposit_stats": deposit_stats,
+        "portfolio_pnl_sol": portfolio_pnl_sol,
+        "portfolio_pnl_usd": portfolio_pnl_usd,
+         "real_pnl_usd": fmt(real_pnl_usd, 2),
+        "total_sol_deposited": fmt(total_sol_deposited, 4),
+        "avg_deposit_price": fmt(avg_deposit_price, 2),
+        "sol_price_change_pct": fmt(sol_price_change_pct, 1),
         "avg_hold_min": round(avg_hold),
+        "fee_pnl_total": fmt(fee_pnl_total, 2),
+        "inventory_pnl_total": fmt(inventory_pnl_total, 2),
+        "split_trades": split_trades,
+        "avg_win_usd": fmt(avg_win_usd, 3),
+        "avg_loss_usd": fmt(avg_loss_usd, 3),
+        "payoff_ratio": fmt(payoff_ratio, 2),
+        "expectancy_usd": fmt(expectancy, 3),
+        "biggest_loss_usd": fmt(biggest_loss, 2),
+        "biggest_win_usd": fmt(biggest_win, 2),
+        "fee_cover_pct": (fmt(fee_cover_pct, 0) if fee_cover_pct is not None else None),
         "tp_count": tp_count,
         "sl_count": sl_count,
         "oor_count": oor_count,
@@ -648,10 +1077,15 @@ async def calendar():
         if not ts: continue
         day = ts[:10]
         if day not in daily:
-            daily[day] = {"date": day, "pnl_usd": 0, "trades": 0, "wins": 0, "fees": 0, "positions": 0}
+            daily[day] = {"date": day, "pnl_usd": 0, "pnl_sol": 0, "trades": 0, "wins": 0, "fees": 0, "fees_sol": 0, "positions": 0}
         daily[day]["pnl_usd"] += p.get("pnl_usd", 0) or 0
+        daily[day]["pnl_sol"] += (p.get("amount_sol", 0) or 0) * ((p.get("pnl_pct", 0) or 0) / 100)
         daily[day]["trades"] += 1
         daily[day]["fees"] += p.get("fees_earned_usd", 0) or 0
+        _ds = p.get("amount_sol", 0) or 0
+        _du = p.get("initial_value_usd", 0) or 0
+        _sp = _du / _ds if _ds else 1
+        daily[day]["fees_sol"] += (p.get("fees_earned_usd", 0) or 0) / _sp if _sp else 0
         if (p.get("pnl_pct", 0) or 0) > 0: daily[day]["wins"] += 1
 
     # Count positions opened per day (from closed trades = each closed = 1 opened)
@@ -674,7 +1108,9 @@ async def calendar():
             "pool": p.get("pool_name", "?"),
             "pnl_pct": round(pnl, 2),
             "pnl_usd": round(p.get("pnl_usd", 0) or 0, 4),
+            "pnl_sol": round((_amt := p.get("amount_sol", 0) or 0) * (pnl / 100), 6),
             "fees": round(p.get("fees_earned_usd", 0) or 0, 4),
+            "fees_sol": round((p.get("fees_earned_usd", 0) or 0) / ((_du := p.get("initial_value_usd", 0) or 0) / _amt if _amt else 1), 6),
             "held": p.get("minutes_held", 0),
             "reason": (p.get("close_reason") or "")[:60],
             "strategy": p.get("strategy", "?"),

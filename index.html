@@ -63,6 +63,14 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
 .stat-v.grn{color:var(--grn)}.stat-v.red{color:var(--red)}.stat-v.blue{color:var(--blue)}.stat-v.org{color:var(--orange)}.stat-v.cyan{color:var(--cyan)}.stat-v.pur{color:var(--purple)}
 .cfg-val.grn,.trade-pair .grn{color:var(--grn)}.cfg-val.red,.trade-pair .red{color:var(--red)}.cfg-val.blue,.trade-pair .blue{color:var(--blue)}.cfg-val.cyan,.trade-pair .cyan{color:var(--cyan)}.cfg-val.warn{color:var(--orange)}
 .stat-sub{font-family:var(--mono);font-size:11px;color:var(--t4);margin-top:4px}
+.econ-head{display:flex;justify-content:space-between;align-items:center;margin:0 0 8px;gap:8px}
+.econ-head h3{font-family:var(--mono);font-size:10px;font-weight:500;color:var(--t3);text-transform:uppercase;letter-spacing:.5px}
+.econ-help-btn{font-family:var(--mono);font-size:11px;color:var(--t3);background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:4px 10px;cursor:pointer;white-space:nowrap;position:relative}
+.econ-help-btn:hover{color:var(--blue);border-color:var(--blue)}
+.econ-help{display:none;background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--blue);border-radius:var(--r);padding:10px 12px;margin-bottom:10px;font-family:var(--mono);font-size:11px;line-height:1.6;color:var(--t3)}
+.econ-help.open{display:block}
+.econ-help b{color:var(--tx)}
+.econ-help .econ-note{margin-top:6px;color:var(--t4);font-size:10px}
 .stat-bar{width:100%;height:3px;background:var(--bg4);border-radius:2px;margin-top:6px;overflow:hidden;display:flex}
 .stat-bar .g{background:var(--grn);height:100%}
 .stat-bar .r{background:var(--red);height:100%}
@@ -260,7 +268,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
   .mn{padding:12px;padding-bottom:80px}
   .stat-session{display:none}
   .stat-session-always{display:block}
-  .stats{grid-template-columns:repeat(3,1fr)}
+  .stats{grid-template-columns:repeat(4,1fr)}
   .stat{padding:10px 10px}
   .stat-l{font-size:9px}
   .stat-v{font-size:16px}
@@ -288,6 +296,9 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
   .cal-pos-item{flex-direction:column;align-items:flex-start;gap:8px}
   .cal-pos-right{text-align:left}
   .cal-positions h3{flex-direction:column;gap:4px}
+  .econ-help{font-size:10px;padding:8px 10px}
+  .econ-help-btn{font-size:10px;padding:3px 8px}
+  .econ-head h3{font-size:9px}
 }
 
 @media(max-width:480px){
@@ -309,6 +320,10 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
   .cal-day .cal-num{font-size:7px;margin-bottom:0}
   .cal-day .cal-pnl{font-size:10px;line-height:1}
   .cal-day .cal-pos{display:none}
+  .econ-help{font-size:9px;padding:6px 8px;line-height:1.5}
+  .econ-help b{font-size:10px}
+  .econ-help-btn{font-size:9px;padding:2px 6px}
+  .econ-head{flex-direction:column;align-items:flex-start;gap:4px}
 }
 </style>
 </head>
@@ -384,7 +399,13 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
           <div class="chart-wrap"><canvas id="perfChart"></canvas></div>
         </div>
         <div class="chart-box">
-          <h3>Daily PnL <span style="color:var(--t4)" id="dailyTag">—</span></h3>
+          <h3 style="display:flex;justify-content:space-between;align-items:center">
+            <span>Daily PnL <span style="color:var(--t4)" id="dailyTag">—</span></span>
+            <span style="display:flex;gap:2px">
+              <span class="term-pill on" onclick="setDailyView('usd')" id="dailyUsd" style="font-size:9px;padding:2px 6px;cursor:pointer">$</span>
+              <span class="term-pill" onclick="setDailyView('sol')" id="dailySol" style="font-size:9px;padding:2px 6px;cursor:pointer">◎</span>
+            </span>
+          </h3>
           <div class="chart-wrap"><canvas id="dailyChart"></canvas></div>
         </div>
         <div style="display:flex;flex-direction:column;gap:12px">
@@ -489,6 +510,8 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
       <div class="term-head">
         <div class="term-title"><div class="term-dot"></div><h2>Calendar</h2></div>
         <div class="term-pills">
+          <div class="term-pill on" onclick="setCalView('usd')" id="calUsd" style="font-size:10px">$</div>
+          <div class="term-pill" onclick="setCalView('sol')" id="calSol" style="font-size:10px">◎</div>
           <div class="term-pill" id="calPrev">‹</div>
           <div class="term-pill" id="calMonth" style="cursor:default">—</div>
           <div class="term-pill" id="calNext">›</div>
@@ -527,11 +550,27 @@ const $=s=>document.querySelector(s);
 const $$=s=>document.querySelectorAll(s);
 const f=(n,d=2)=>n==null||isNaN(n)?'—':Number(n).toFixed(d);
 const usd=n=>n==null||isNaN(n)?'—':(n>=0?'+':'-')+'$'+Math.abs(n).toFixed(2);
+const sol=n=>n==null||isNaN(n)?'—':(n>=0?'+':'')+Number(n).toFixed(6)+' SOL';
 const tm=m=>{if(!m)return'—';m=Math.round(m);return m<60?m+'m':(m/60).toFixed(1)+'h';};
 const cc=n=>n>0?'w':n<0?'l':'z';
 
 let allH=[],pgSz=15,pgCur=1,data=null,curPage='overview';
+let dailyView='usd',calView='usd';
 let charts={};
+
+function setDailyView(v){
+  dailyView=v;
+  document.getElementById('dailyUsd').classList.toggle('on',v==='usd');
+  document.getElementById('dailySol').classList.toggle('on',v==='sol');
+  if(data&&data.daily)renderDailyChart(data.daily);
+}
+function setCalView(v){
+  calView=v;
+  document.getElementById('calUsd').classList.toggle('on',v==='usd');
+  document.getElementById('calSol').classList.toggle('on',v==='sol');
+  renderCalendar();
+  renderCalPositions();
+}
 
 async function fj(p){try{return(await fetch(p)).json()}catch{return null}}
 
@@ -573,74 +612,69 @@ async function load(){
 
 function renderStats(d){
   const pnl=d.net_pnl_usd||0;
+  const pnlSol=d.net_pnl_sol||0;
   const unrealized=d.unrealized_pnl_usd||0;
+  const unrealizedSol=d.unrealized_pnl_sol||0;
   const unclaimed=d.unclaimed_fees_usd||0;
+  const unclaimedSol=d.unclaimed_fees_sol||0;
+  const realPnl=d.real_pnl_usd||0;
+  const ds=d.deposit_stats||{};
+  const depAvg=ds.avg_price||0;
+  const depCount=ds.count||0;
+  const portfolioSol=d.portfolio_pnl_sol;
+  const portfolioUsd=d.portfolio_pnl_usd;
   const pnlColor=pnl>=0?'grn':'red';
   const unrColor=unrealized>=0?'grn':'red';
-
-  // Session duration from boot_time (agent process start)
-  let session='—';
-  if(d.boot_time){
-    const diff=(Date.now()-new Date(d.boot_time).getTime())/(86400000);
-    session=diff<1?(diff*24).toFixed(1)+'h':diff.toFixed(1)+'d';
-  }
-
-  const wb=d.wallet_balance;
-  const eq=d.total_equity_usd;
-  const posVal=d.positions_value_usd||0;
-  const rentVal=d.rent_usd||0;
-  const hasWallet=d.wallet_rpc_enabled && d.has_helius_key;
-  
-  // Net Worth — only show when wallet RPC is enabled
-  let eqVal, eqSub, eqTitle;
-  if(hasWallet && wb && wb.total_usd!=null){
-    eqVal='$'+f(eq||(wb.total_usd+posVal+(rentVal||0)));
-    eqSub='$'+f(wb.total_usd)+' wallet + $'+f(posVal)+' pos + $'+f(rentVal)+' rent';
-    eqTitle=(wb.as_of?'wallet as of '+ago(wb.as_of)+' · ':'')+'rent est. '+f(d.rent_sol,3)+' SOL/pos';
-  } else {
-    eqVal='—';
-    eqSub='wallet RPC disabled';
-    eqTitle='';
-  }
-
-  // Session stat — always visible on mobile when wallet is hidden
-  const sessionClass=hasWallet?'stat stat-session':'stat stat-session-always';
+  const realPnlColor=realPnl>=0?'grn':'red';
+  const aw=d.avg_win_usd||0, al=d.avg_loss_usd||0;
+  const solPrice=d.sol_price||0;
+  const depChange=depAvg>0&&solPrice>0?((solPrice-depAvg)/depAvg*100):0;
+  const depChangeColor=depChange>=0?'grn':'red';
+  const portColor=portfolioSol!=null?(portfolioSol>=0?'grn':'red'):'t3';
 
   let statsHtml=`
-    ${hasWallet ? `<div class="stat" title="${eqTitle}"><div class="stat-l">Net Worth</div><div class="stat-v grn">${eqVal}</div><div class="stat-sub">${eqSub}</div></div>` : ''}
-    <div class="stat"><div class="stat-l">Open</div><div class="stat-v blue">${d.position_count}/${d.max_positions}</div><div class="stat-sub">positions active</div></div>
-    <div class="stat"><div class="stat-l">Unrealized PnL</div><div class="stat-v ${unrColor}">${usd(unrealized)}</div><div class="stat-sub">open positions</div></div>
-    <div class="stat"><div class="stat-l">Unclaimed Fees</div><div class="stat-v cyan">$${f(unclaimed,4)}</div><div class="stat-sub">pending claim</div></div>
-    <div class="stat"><div class="stat-l">Net PnL</div><div class="stat-v ${pnlColor}">${usd(pnl)}</div><div class="stat-sub">${d.total_trades} trades closed</div></div>
-    <div class="stat"><div class="stat-l">Fees Earned</div><div class="stat-v grn">$${f(d.total_fees,4)}</div><div class="stat-sub">LP yield collected</div></div>
-    <div class="${sessionClass}"><div class="stat-l">Session</div><div class="stat-v cyan">${session}</div><div class="stat-sub">agent uptime</div></div>
+    <div class="stat"><div class="stat-l">Open</div><div class="stat-v blue">${d.position_count}/${d.max_positions}</div><div class="stat-sub">positions</div></div>
+    <div class="stat"><div class="stat-l">Unrealized</div><div class="stat-v ${unrColor}">${usd(unrealized)}</div><div class="stat-sub">${sol(unrealizedSol)}</div></div>
+    <div class="stat"><div class="stat-l">Unclaimed</div><div class="stat-v cyan">$${f(unclaimed,4)}</div><div class="stat-sub">${f(unclaimedSol,6)} SOL</div></div>
+    <div class="stat"><div class="stat-l">Net PnL</div><div class="stat-v ${pnlColor}">${usd(pnl)}</div><div class="stat-sub">${sol(pnlSol)}</div></div>
+    <div class="stat"><div class="stat-l">Avg Win</div><div class="stat-v grn">$${f(aw)}</div><div class="stat-sub">per win</div></div>
+    <div class="stat"><div class="stat-l">Avg Loss</div><div class="stat-v red">${usd(al)}</div><div class="stat-sub">per loss</div></div>
+    <div class="stat"><div class="stat-l">Real PnL</div><div class="stat-v ${realPnlColor}">${usd(realPnl)}</div><div class="stat-sub">SOL gains @ today</div></div>
+    <div class="stat"><div class="stat-l">Portfolio</div><div class="stat-v ${portColor}">${portfolioUsd!=null?usd(portfolioUsd):'—'}</div><div class="stat-sub">${portfolioSol!=null?sol(portfolioSol):'wallet vs deposit'}${depCount>0?' · '+depCount+' dep':''}</div></div>
   `;
   $('#statRow').innerHTML=statsHtml;
 }
-
 function renderChart(daily){
   if(!daily||!daily.length){$('#perfChart').parentElement.innerHTML='<div class="chart-empty">No data</div>';return;}
   const lb=daily.map(x=>x.date.slice(5));
   const cu=daily.map(x=>x.cumulative);
+  const cuSol=daily.map(x=>x.cumulative_sol||0);
   const lastVal=cu[cu.length-1]||0;
+  const lastValSol=cuSol[cuSol.length-1]||0;
   const lineColor=lastVal>=0?'#00e676':'#ff5252';
+  const lineColorSol=lastValSol>=0?'#448aff':'#ff9100';
   const gc='#252525',tc='#666';
-  const o={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#1a1a1a',titleFont:{family:'JetBrains Mono',weight:'600',size:11},bodyFont:{family:'JetBrains Mono',size:11},padding:8,borderColor:'#333',borderWidth:1,displayColors:false}},scales:{x:{grid:{color:gc,drawBorder:false},ticks:{color:tc,font:{family:'JetBrains Mono',size:10}}},y:{grid:{color:gc,drawBorder:false},ticks:{color:tc,font:{family:'JetBrains Mono',size:10},callback:v=>'$'+v}}}};
+  const o={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,labels:{color:'#999',font:{family:'JetBrains Mono',size:10},boxWidth:12,padding:8}},tooltip:{backgroundColor:'#1a1a1a',titleFont:{family:'JetBrains Mono',weight:'600',size:11},bodyFont:{family:'JetBrains Mono',size:11},padding:8,borderColor:'#333',borderWidth:1,displayColors:true}},scales:{x:{grid:{color:gc,drawBorder:false},ticks:{color:tc,font:{family:'JetBrains Mono',size:10}}},y:{grid:{color:gc,drawBorder:false},ticks:{color:tc,font:{family:'JetBrains Mono',size:10},callback:v=>v.toFixed(2)}}}};
   $('#chTag').textContent=daily[daily.length-1]?.trades+' trades';
   if(charts.perf)charts.perf.destroy();
-  charts.perf=new Chart($('#perfChart'),{type:'line',data:{labels:lb,datasets:[{data:cu,borderColor:lineColor,backgroundColor:ctx=>{const g=ctx.chart.ctx.createLinearGradient(0,0,0,200);g.addColorStop(0,lineColor==='#00e676'?'rgba(0,230,118,.1)':'rgba(255,82,82,.1)');g.addColorStop(1,'rgba(0,0,0,0)');return g},fill:true,tension:.3,pointRadius:2,borderWidth:2,pointBackgroundColor:lineColor,pointBorderColor:'#141414',pointBorderWidth:1.5}]},options:o});
+  charts.perf=new Chart($('#perfChart'),{type:'line',data:{labels:lb,datasets:[{label:'USD',data:cu,borderColor:lineColor,backgroundColor:ctx=>{const g=ctx.chart.ctx.createLinearGradient(0,0,0,200);g.addColorStop(0,lineColor==='#00e676'?'rgba(0,230,118,.1)':'rgba(255,82,82,.1)');g.addColorStop(1,'rgba(0,0,0,0)');return g},fill:true,tension:.3,pointRadius:2,borderWidth:2,pointBackgroundColor:lineColor,pointBorderColor:'#141414',pointBorderWidth:1.5},{label:'SOL',data:cuSol,borderColor:lineColorSol,backgroundColor:'transparent',fill:false,tension:.3,pointRadius:1.5,borderWidth:1.5,borderDash:[4,2],pointBackgroundColor:lineColorSol,pointBorderColor:'#141414',pointBorderWidth:1,yAxisID:'y1'}]},options:{...o,scales:{...o.scales,y1:{position:'right',grid:{drawOnChartArea:false},ticks:{color:lineColorSol,font:{family:'JetBrains Mono',size:10},callback:v=>v.toFixed(4)+' SOL'}}}}});
 }
 
 function renderDailyChart(daily){
   if(!daily||!daily.length){$('#dailyChart').parentElement.innerHTML='<div class="chart-empty">No data</div>';return;}
   const lb=daily.map(x=>x.date.slice(5));
-  const vals=daily.map(x=>x.pnl_usd);
-  const colors=vals.map(x=>x>=0?'rgba(0,230,118,.6)':'rgba(255,82,82,.5)');
+  const valsUsd=daily.map(x=>x.pnl_usd);
+  const valsSol=daily.map(x=>x.pnl_sol||0);
+  const isSol=dailyView==='sol';
+  const vals=isSol?valsSol:valsUsd;
+  const colors=vals.map(x=>x>=0?(isSol?'rgba(68,138,255,.6)':'rgba(0,230,118,.6)'):(isSol?'rgba(255,145,0,.5)':'rgba(255,82,82,.5)'));
   const gc='#252525',tc='#666';
-  const o={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#1a1a1a',titleFont:{family:'JetBrains Mono',weight:'600',size:11},bodyFont:{family:'JetBrains Mono',size:11},padding:8,borderColor:'#333',borderWidth:1,displayColors:false}},scales:{x:{grid:{color:gc,drawBorder:false},ticks:{color:tc,font:{family:'JetBrains Mono',size:10}}},y:{grid:{color:gc,drawBorder:false},ticks:{color:tc,font:{family:'JetBrains Mono',size:10},callback:v=>'$'+v}}}};
-  const totalPnl=vals.reduce((a,b)=>a+b,0);
+  const yFmt=isSol?v=>v.toFixed(4)+' SOL':v=>'$'+v;
+  const o={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#1a1a1a',titleFont:{family:'JetBrains Mono',weight:'600',size:11},bodyFont:{family:'JetBrains Mono',size:11},padding:8,borderColor:'#333',borderWidth:1,displayColors:false,callbacks:{label:ctx=>isSol?ctx.parsed.y.toFixed(6)+' SOL':'$'+ctx.parsed.y.toFixed(2)}}},scales:{x:{grid:{color:gc,drawBorder:false},ticks:{color:tc,font:{family:'JetBrains Mono',size:10}}},y:{grid:{color:gc,drawBorder:false},ticks:{color:tc,font:{family:'JetBrains Mono',size:10},callback:yFmt}}}};
+  const totalPnl=valsUsd.reduce((a,b)=>a+b,0);
+  const totalPnlSol=valsSol.reduce((a,b)=>a+b,0);
   const totalTrades=daily.reduce((a,b)=>a+(b.trades||0),0);
-  $('#dailyTag').textContent=totalTrades+' trades • '+usd(totalPnl);
+  $('#dailyTag').textContent=totalTrades+' trades • '+(isSol?totalPnlSol.toFixed(4)+' SOL':usd(totalPnl));
   if(charts.daily)charts.daily.destroy();
   charts.daily=new Chart($('#dailyChart'),{type:'bar',data:{labels:lb,datasets:[{data:vals,backgroundColor:colors,borderRadius:3,borderSkipped:false}]},options:o});
 }
@@ -705,9 +739,10 @@ function renderPositions(positions){
         <div class="pos-name">${p.pair}</div>
         <div class="pos-addr">${p.address}</div>
         <div class="pos-row"><span class="k">Deposited</span><span class="v">${p.amount_sol} SOL</span></div>
-        <div class="pos-row"><span class="k">Value</span><span class="v">${p.total_value_usd!=null?'$'+f(p.total_value_usd):'—'}</span></div>
+        <div class="pos-row"><span class="k">Value</span><span class="v">${p.total_value_usd!=null?'$'+f(p.total_value_usd):'—'}${p.total_value_sol!=null?' ('+f(p.total_value_sol,6)+' SOL)':''}</span></div>
         <div class="pos-row"><span class="k">Unrealized PnL</span><span class="v ${p.unrealized_pnl_usd>=0?'grn':'red'}">${p.unrealized_pnl_usd!=null?usd(p.unrealized_pnl_usd):'—'}${p.unrealized_pnl_pct!=null?` (${p.unrealized_pnl_pct>=0?'+':''}${f(p.unrealized_pnl_pct)}%)`:''}</span></div>
-        <div class="pos-row"><span class="k">Unclaimed Fees</span><span class="v cyan">${p.unclaimed_fees_usd!=null?'$'+f(p.unclaimed_fees_usd,4):'—'}</span></div>
+        ${p.unrealized_pnl_sol!=null?`<div class="pos-row"><span class="k">PnL (SOL)</span><span class="v ${p.unrealized_pnl_sol>=0?'grn':'red'}">${sol(p.unrealized_pnl_sol)}</span></div>`:''}
+        <div class="pos-row"><span class="k">Unclaimed Fees</span><span class="v cyan">${p.unclaimed_fees_usd!=null?'$'+f(p.unclaimed_fees_usd,4):'—'}${p.unclaimed_fees_sol!=null?' ('+f(p.unclaimed_fees_sol,6)+' SOL)':''}</span></div>
         <div class="pos-row"><span class="k">Range</span><span class="v">${p.bins_below}d × ${p.bin_step} step = ${rangeW.toFixed(0)}%</span></div>
         <div class="pos-row"><span class="k">Organic</span><span class="v">${p.organic_score||'—'}/100</span></div>
         <div class="pos-row"><span class="k">Deployed</span><span class="v">${dep}</span></div>
@@ -745,9 +780,11 @@ function renderRecentTrades(history){
   $('#recentCount').textContent=history.length+' total';
   el.innerHTML=recent.map(t=>{
     const pnl=t.pnl_usd||0,pct=t.pnl_pct||0;
+    const pnlSol=t.pnl_sol||0;
+    const feesSol=t.fees_sol||0;
     const dt=t.recorded_at?new Date(t.recorded_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
     const r=(t.close_reason||'—');const sr=r.length>20?r.slice(0,20)+'…':r;
-    return `<div class="trade-item"><div class="trade-info"><div class="trade-pair">${t.pool_name||'—'}</div><div class="trade-meta">${tm(t.minutes_held)} • ${sr} • ${dt}</div></div><div><div class="trade-pnl ${pnl>=0?'grn':'red'}">${usd(pnl)}</div><div class="trade-pnl-sub">${pct>=0?'+':''}${f(pct)}%</div></div></div>`;
+    return `<div class="trade-item"><div class="trade-info"><div class="trade-pair">${t.pool_name||'—'}</div><div class="trade-meta">${tm(t.minutes_held)} • ${sr} • ${dt}</div></div><div><div class="trade-pnl ${pnl>=0?'grn':'red'}">${usd(pnl)} <span style="font-size:10px;opacity:.7">${pnlSol>=0?'+':''}${pnlSol.toFixed(6)}</span></div><div class="trade-pnl-sub">${pct>=0?'+':''}${f(pct)}% • fees ${f(feesSol,6)} SOL</div></div></div>`;
   }).join('');
 }
 
@@ -821,19 +858,24 @@ function renderCalendar(){
   const todayStr=today.toISOString().slice(0,10);
   // Monthly stats
   let monthPnl=0,monthTrades=0,monthWins=0,monthDays=0;
+  let monthPnlSol=0;
   for(let d=1;d<=totalDays;d++){
     const ds=`${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const dd=calDaily[ds];
     if(dd){
       monthPnl+=dd.pnl_usd||0;
+      monthPnlSol+=dd.pnl_sol||0;
       monthTrades+=dd.trades||0;
       monthWins+=dd.wins||0;
       monthDays++;
     }
   }
   const winRate=monthTrades>0?Math.round(monthWins/monthTrades*100):0;
+  const isCalSol=calView==='sol';
+  const calMonthPnl=isCalSol?monthPnlSol:monthPnl;
+  const calMonthLabel=isCalSol?(monthPnlSol>=0?'+':'')+monthPnlSol.toFixed(4)+' SOL':usd(monthPnl);
   $('#calStats').innerHTML=`
-    <div class="stat"><div class="stat-l">Month PnL</div><div class="stat-v ${monthPnl>=0?'grn':'red'}">${usd(monthPnl)}</div></div>
+    <div class="stat"><div class="stat-l">Month PnL</div><div class="stat-v ${calMonthPnl>=0?'grn':'red'}">${calMonthLabel}</div></div>
     <div class="stat"><div class="stat-l">Trades</div><div class="stat-v">${monthTrades}</div></div>
     <div class="stat"><div class="stat-l">Win Rate</div><div class="stat-v">${winRate}%</div></div>
     <div class="stat"><div class="stat-l">Active Days</div><div class="stat-v">${monthDays}</div></div>
@@ -851,12 +893,13 @@ function renderCalendar(){
     if(!dayData){
       h+=`<div class="${cls}" data-date="${dateStr}"><div class="cal-num">${d}</div></div>`;
     }else{
-      const pnl=dayData.pnl_usd||0;
-      const posClass=pnl>0.001?'profit':pnl<-0.001?'loss':'no-activity';
+      const pnlUsd=dayData.pnl_usd||0;
+      const pnlSol=dayData.pnl_sol||0;
+      const pnl=isCalSol?pnlSol:pnlUsd;
+      const posClass=pnlUsd>0.001?'profit':pnlUsd<-0.001?'loss':'no-activity';
       cls+=' '+posClass;
-      const pnlStr=pnl!==0?usd(pnl):'—';
-      const posColor=pnl>0.001?'color:var(--grn)':pnl<-0.001?'color:var(--red)':'color:var(--t4)';
-      h+=`<div class="${cls}" data-date="${dateStr}" title="${dateStr}: ${usd(pnl)} (${dayData.trades} positions)"><div class="cal-num">${d}</div><div class="cal-center"><div class="cal-pnl">${pnlStr}</div>${dayData.trades?`<div class="cal-pos ${posClass}">${dayData.trades} positions</div>`:''}</div></div>`;
+      const pnlStr=isCalSol?(pnlSol!==0?(pnlSol>=0?'+':'')+pnlSol.toFixed(4)+' SOL':'—'):(pnlUsd!==0?usd(pnlUsd):'—');
+      h+=`<div class="${cls}" data-date="${dateStr}" title="${dateStr}: ${usd(pnlUsd)} / ${pnlSol.toFixed(4)} SOL (${dayData.trades} positions)"><div class="cal-num">${d}</div><div class="cal-center"><div class="cal-pnl">${pnlStr}</div>${dayData.trades?`<div class="cal-pos ${posClass}">${dayData.trades} positions</div>`:''}</div></div>`;
     }
   }
   $('#calGrid').innerHTML=h;
@@ -877,12 +920,23 @@ function renderCalPositions(){
     return;
   }
   const totalPnl=positions.reduce((a,p)=>a+p.pnl_usd,0);
+  const totalPnlSol=positions.reduce((a,p)=>a+(p.pnl_sol||0),0);
   const totalFees=positions.reduce((a,p)=>a+p.fees,0);
-  el.innerHTML=`<div class="cal-positions"><h3>${dateLabel} <span style="font-size:11px;color:var(--t3)">${positions.length} positions • PnL ${usd(totalPnl)} • Fees $${totalFees.toFixed(4)}</span></h3><div class="cal-pos-list">${positions.map(p=>{
-    const pnlClass=p.pnl_usd>=0?'grn':'red';
+  const totalFeesSol=positions.reduce((a,p)=>a+(p.fees_sol||0),0);
+  const isCalPs=calView==='sol';
+  const dayPnl=isCalPs?totalPnlSol:totalPnl;
+  const dayPnlLabel=isCalPs?(totalPnlSol>=0?'+':'')+totalPnlSol.toFixed(4)+' SOL':usd(totalPnl);
+  const dayFees=isCalPs?totalFeesSol:totalFees;
+  const dayFeesLabel=isCalPs?f(dayFees,6)+' SOL':'$'+dayFees.toFixed(4);
+  el.innerHTML=`<div class="cal-positions"><h3>${dateLabel} <span style="font-size:11px;color:var(--t3)">${positions.length} positions • PnL ${dayPnlLabel} • Fees ${dayFeesLabel}</span></h3><div class="cal-pos-list">${positions.map(p=>{
     const held=p.held<60?p.held+'m':(p.held/60).toFixed(1)+'h';
     const reason=p.reason||'—';
-    return `<div class="cal-pos-item"><div class="cal-pos-left"><div class="cal-pos-pool">${p.pool}</div><div class="cal-pos-meta">${p.strategy} • ${held} • ${reason}</div></div><div class="cal-pos-right"><div class="cal-pos-pnl ${pnlClass}">${usd(p.pnl_usd)}</div><div class="cal-pos-fee">${p.pnl_pct>=0?'+':''}${p.pnl_pct}% • fees $${p.fees.toFixed(4)}</div></div></div>`;
+    const pPnl=isCalPs?(p.pnl_sol||0):p.pnl_usd;
+    const pPnlLabel=isCalPs?(p.pnl_sol>=0?'+':'')+((p.pnl_sol||0).toFixed(4))+' SOL':usd(p.pnl_usd);
+    const pPnlColor=pPnl>=0?'grn':'red';
+    const pFees=isCalPs?(p.fees_sol||0):p.fees;
+    const pFeesLabel=isCalPs?f(pFees,6)+' SOL':'$'+p.fees.toFixed(4);
+    return `<div class="cal-pos-item"><div class="cal-pos-left"><div class="cal-pos-pool">${p.pool}</div><div class="cal-pos-meta">${p.strategy} • ${held} • ${reason}</div></div><div class="cal-pos-right"><div class="cal-pos-pnl ${pPnlColor}">${pPnlLabel}</div><div class="cal-pos-fee">${p.pnl_pct>=0?'+':''}${p.pnl_pct}% • fees ${pFeesLabel}</div></div></div>`;
   }).join('')}</div></div>`;
 }
 document.getElementById('calPrev').addEventListener('click',()=>{calMonth--;if(calMonth<0){calMonth=11;calYear--;}renderCalendar();});
@@ -1047,11 +1101,13 @@ function syncLearnHeights(){
 function renderTbl(){
   const s=(pgCur-1)*pgSz,e=Math.min(s+pgSz,allH.length);
   const page=allH.slice(s,e);
-  let h='<table><thead><tr><th>Pool</th><th>Size</th><th>Fees</th><th>Hold</th><th>Reason</th><th>Score</th><th>PnL</th><th>%</th><th>Date</th></tr></thead><tbody>';
+  let h='<table><thead><tr><th>Pool</th><th>Size</th><th>PnL</th><th>SOL</th><th>Real PnL</th><th>Hold</th><th>Date</th></tr></thead><tbody>';
   for(const t of page){
     const dt=t.recorded_at?new Date(t.recorded_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
-    const p=t.pnl_usd||0,pct=t.pnl_pct||0,r=t.close_reason||'—',sr=r.length>30?r.slice(0,30)+'…':r;
-    h+=`<tr><td class="pn">${t.pool_name||'—'}</td><td>${f(t.amount_sol,2)} SOL</td><td>$${f(t.fees_earned_usd,4)}</td><td>${tm(t.minutes_held)}</td><td title="${r}" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--t4)">${sr}</td><td>${t.organic_score!=null?t.organic_score:'—'}</td><td><span class="chip ${cc(p)}">${usd(p)}</span></td><td><span class="chip ${cc(pct)}">${f(pct)}%</span></td><td style="color:var(--t4)">${dt}</td></tr>`;
+    const p=t.pnl_usd||0,pct=t.pnl_pct||0;
+    const pnlSol=t.pnl_sol||0;
+    const realPnl=t.real_pnl_usd;
+    h+=`<tr><td class="pn">${t.pool_name||'—'}</td><td>${f(t.amount_sol,2)} SOL</td><td><span class="chip ${cc(p)}">${usd(p)} (${pct>=0?'+':''}${f(pct)}%)</span></td><td style="color:${pnlSol>=0?'var(--grn)':'var(--red)'};font-weight:600">${pnlSol>=0?'+':''}${pnlSol.toFixed(6)}</td><td style="color:${realPnl>=0?'var(--grn)':'var(--red)'}">${realPnl!=null?usd(realPnl):'—'}</td><td>${tm(t.minutes_held)}</td><td style="color:var(--t4)">${dt}</td></tr>`;
   }
   h+='</tbody></table>';
   $('#hTbl').innerHTML=h;

@@ -2,3 +2,5 @@
 __pycache__/
 *.pyc
 .env
+dashboard-config.json
+deposits.json
