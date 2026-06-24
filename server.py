@@ -788,11 +788,11 @@ async def dashboard():
             except:
                 pass
         
-        # Add deployed SOL from open positions (use amount_sol, not USD conversion)
+        # Add CURRENT value of open positions in SOL (total_value_sol reflects unrealized PnL; fallback amount_sol)
         # This avoids double-counting: wallet SOL is POST-deploy (what's left),
         # positions Sol is what was deployed INTO LP positions.
         for p in active:
-            current_sol += (p.get("amount_sol", 0) or 0)
+            current_sol += (p.get("total_value_sol") or p.get("amount_sol", 0) or 0)
         
         # Add rent fees (SOL locked in rent)
         if rent_sol_total > 0:
