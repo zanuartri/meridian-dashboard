@@ -351,8 +351,12 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
         Positions
       </div>
       <div class="nav-i" data-page="candidates">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         Candidates
+      </div>
+      <div class="nav-i" data-page="activity">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+        Activity
       </div>
       <div class="nav-i" data-page="history">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
@@ -448,10 +452,22 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
       <div class="pos-grid" id="posGrid"></div>
     </div>
 
-    <!-- ═══ CANDIDATES ═══ -->
+    <!-- ═══ CANDIDATES (Pool Candidates) ═══ -->
     <div class="page" id="pg-candidates">
       <div class="term-head">
-        <div class="term-title"><div class="term-dot"></div><h2>Candidates</h2></div>
+        <div class="term-title"><div class="term-dot"></div><h2>Pool Candidates</h2></div>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--t4)" id="candCount">—</span>
+      </div>
+      <div class="stats" id="candPoolStats" style="margin-bottom:12px;grid-template-columns:repeat(4,1fr)"></div>
+      <div class="tbl-box">
+        <div class="tbl-scroll" id="candPoolTbl"></div>
+      </div>
+    </div>
+
+    <!-- ═══ ACTIVITY (Decision Log) ═══ -->
+    <div class="page" id="pg-activity">
+      <div class="term-head">
+        <div class="term-title"><div class="term-dot"></div><h2>Activity Log</h2></div>
         <div class="term-pills" id="candFilters">
           <div class="term-pill on" data-filter="all" onclick="setCandFilter('all')">All</div>
           <div class="term-pill" data-filter="deploy" onclick="setCandFilter('deploy')">Deployed</div>
@@ -583,7 +599,8 @@ $$('.nav-i').forEach(el=>{
     $$('.page').forEach(p=>p.classList.remove('active'));
     document.getElementById('pg-'+pg).classList.add('active');
     curPage=pg;
-    if(pg==='candidates')loadCandidates();
+    if(pg==='candidates')loadPoolCandidates();
+    if(pg==='activity')loadCandidates();
     if(pg==='learning')loadLearning();
     if(pg==='calendar')loadCalendar();
   });
@@ -942,7 +959,56 @@ function renderCalPositions(){
 document.getElementById('calPrev').addEventListener('click',()=>{calMonth--;if(calMonth<0){calMonth=11;calYear--;}renderCalendar();});
 document.getElementById('calNext').addEventListener('click',()=>{calMonth++;if(calMonth>11){calMonth=0;calYear++;}renderCalendar();});
 
-// ═══ CANDIDATES ═══
+// ═══ POOL CANDIDATES (latest cached from screening) ═══
+function fmtK(n){if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1e3)return(n/1e3).toFixed(1)+'K';return n.toFixed(0);}
+async function loadPoolCandidates(){
+  const d=await fj('/api/candidates-latest');if(!d);
+  const candidates=d.candidates||[];
+  const total=d.total||0;
+  const updatedAt=d.updatedAt;
+  
+  // Stats from candidates
+  const totalVol=candidates.reduce((a,c)=>a+(c.volume_window||c.volume_24h||0),0);
+  const avgOrganic=candidates.length?candidates.reduce((a,c)=>a+(c.organic_score||0),0)/candidates.length:0;
+  const avgFeeTvl=candidates.length?candidates.reduce((a,c)=>a+(c.fee_active_tvl_ratio||c.fee_tvl_ratio||0),0)/candidates.length:0;
+  
+  const timeAgo=updatedAt?ago(updatedAt):'never';
+  
+  $('#candPoolStats').innerHTML=`
+    <div class="stat"><div class="stat-l">Candidates</div><div class="stat-v">${total}</div><div class="stat-sub">last scan ${timeAgo}</div></div>
+    <div class="stat"><div class="stat-l">Total Volume</div><div class="stat-v">$${fmtK(totalVol)}</div></div>
+    <div class="stat"><div class="stat-l">Avg Organic</div><div class="stat-v ${avgOrganic>=60?'grn':'red'}">${avgOrganic.toFixed(0)}</div></div>
+    <div class="stat"><div class="stat-l">Avg Fee/TVL</div><div class="stat-v ${avgFeeTvl>=0.05?'grn':'red'}">${(avgFeeTvl*100).toFixed(2)}%</div></div>
+  `;
+  $('#candCount').textContent=total+' candidates';
+  
+  // Table
+  if(!candidates.length){$('#candPoolTbl').innerHTML='<div style="padding:24px;text-align:center;color:var(--t4);font-family:var(--mono);font-size:11px">No cached candidates yet. Run /screen in Meridian.</div>';return;}
+  
+  let h='<table><thead><tr><th>Pool</th><th>Volume</th><th>Organic</th><th>Fee/TVL</th><th>Active%</th><th>Holders</th><th>Source</th></tr></thead><tbody>';
+  for(const c of candidates){
+    const name=c.pool_name||c.name||c.base_mint?.slice(0,6)+'?'||'?';
+    const vol=c.volume_window||c.volume_24h||0;
+    const organic=c.organic_score||0;
+    const feeTvl=c.fee_active_tvl_ratio||c.fee_tvl_ratio||0;
+    const active=c.active_pct||0;
+    const holders=c.holder_count||c.holders||0;
+    const src=c.source||(c.gmgn?'GMGN':'Meteora');
+    h+=`<tr>
+      <td class="pn" style="white-space:nowrap"><a href="https://app.meteora.ag/dlmm/${c.pool_address||c.pool||''}" target="_blank" style="color:var(--tx);text-decoration:none">${name}</a></td>
+      <td style="text-align:center">$${fmtK(vol)}</td>
+      <td style="text-align:center" class="${organic>=60?'grn':'red'}">${organic}</td>
+      <td style="text-align:center" class="${feeTvl>=0.05?'grn':'red'}">${(feeTvl*100).toFixed(2)}%</td>
+      <td style="text-align:center">${active}%</td>
+      <td style="text-align:center">${holders}</td>
+      <td style="text-align:center;color:var(--t3)">${src}</td>
+    </tr>`;
+  }
+  h+='</tbody></table>';
+  $('#candPoolTbl').innerHTML=h;
+}
+
+// ═══ ACTIVITY (Decision Log) ═══
 let allC=[],allCfiltered=[],candPgSz=15,candPgCur=1,candFilter='all';
 async function loadCandidates(){
   const d=await fj('/api/candidates');if(!d)return;
@@ -1131,6 +1197,7 @@ const mobPages=[
   {id:'overview',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>'},
   {id:'positions',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>'},
   {id:'candidates',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>'},
+  {id:'activity',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>'},
   {id:'history',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>'},
   {id:'calendar',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>'},
   {id:'learning',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>'},
@@ -1154,7 +1221,8 @@ mobNav.querySelectorAll('.mob-nav-i').forEach(el=>{
     $$('.page').forEach(p=>p.classList.remove('active'));
     document.getElementById('pg-'+pg).classList.add('active');
     curPage=pg;
-    if(pg==='candidates')loadCandidates();
+    if(pg==='candidates')loadPoolCandidates();
+    if(pg==='activity')loadCandidates();
     if(pg==='learning')loadLearning();
     if(pg==='calendar')loadCalendar();
     window.scrollTo(0,0);

@@ -1000,6 +1000,80 @@ async def candidates():
         }
     }
 
+@app.get("/api/pool-candidates")
+async def pool_candidates():
+    """Return pool candidates from pool-memory.json for the Candidates tab."""
+    pool_mem = load("pool-memory.json")
+    state_data = load("state.json")
+    
+    # Get open positions
+    open_positions = state_data.get("positions", {})
+    open_pools = set()
+    for pos in open_positions.values() if isinstance(open_positions, dict) else []:
+        open_pools.add(pos.get("pool", ""))
+    
+    candidates = []
+    for addr, data in pool_mem.items():
+        deploys = data.get("deploys", [])
+        total_deploys = len(deploys)
+        if total_deploys == 0:
+            continue
+            
+        # Calculate stats
+        pnl_values = [d.get("pnl_pct", 0) or 0 for d in deploys]
+        wins = sum(1 for p in pnl_values if p > 0)
+        avg_pnl = sum(pnl_values) / len(pnl_values) if pnl_values else 0
+        total_fees_usd = sum(d.get("fees_earned_usd", 0) or 0 for d in deploys)
+        total_pnl_usd = sum(d.get("pnl_usd", 0) or 0 for d in deploys)
+        
+        # Last deploy info
+        last_deploy = deploys[-1] if deploys else {}
+        last_outcome = data.get("last_outcome", "unknown")
+        last_pnl = last_deploy.get("pnl_pct", 0) or 0
+        last_held = last_deploy.get("minutes_held", 0) or 0
+        
+        candidates.append({
+            "pool": addr,
+            "name": data.get("name", "?"),
+            "base_mint": data.get("base_mint", ""),
+            "total_deploys": total_deploys,
+            "wins": wins,
+            "losses": total_deploys - wins,
+            "win_rate": round(wins / total_deploys * 100) if total_deploys > 0 else 0,
+            "avg_pnl_pct": round(avg_pnl, 1),
+            "total_pnl_usd": round(total_pnl_usd, 2),
+            "total_fees_usd": round(total_fees_usd, 2),
+            "last_outcome": last_outcome,
+            "last_pnl_pct": round(last_pnl, 1),
+            "last_held_min": last_held,
+            "is_open": addr in open_pools,
+        })
+    
+    # Sort by total deploys (most deployed first)
+    candidates.sort(key=lambda x: x["total_deploys"], reverse=True)
+    
+    return {
+        "candidates": candidates,
+        "total": len(candidates),
+        "open_pools": len(open_pools),
+    }
+
+@app.get("/api/candidates-latest")
+async def candidates_latest():
+    """Return latest cached candidates from Meridian screening (candidates-cache.json)."""
+    cache_path = MERIDIAN / "candidates-cache.json"
+    if not cache_path.exists():
+        return {"candidates": [], "updatedAt": None, "total": 0}
+    try:
+        data = json.loads(cache_path.read_text())
+        return {
+            "candidates": data.get("candidates", []),
+            "updatedAt": data.get("updatedAt"),
+            "total": len(data.get("candidates", [])),
+        }
+    except Exception:
+        return {"candidates": [], "updatedAt": None, "total": 0}
+
 @app.get("/api/learning")
 async def learning():
     lessons_data = load("lessons.json")
