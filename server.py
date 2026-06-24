@@ -814,9 +814,10 @@ async def dashboard():
             current_sol += tokens_sol
         
         if current_sol > 0:
-            total_deposited = deposit_stats.get("total_sol", 0)
-            portfolio_pnl_sol = round(current_sol - total_deposited, 6)
-            portfolio_pnl_usd = round(portfolio_pnl_sol * sol_price_for_pnl, 2) if sol_price_for_pnl else None
+            deposited_usd = deposit_stats.get("total_usd", 0)
+            current_usd = round(current_sol * sol_price_for_pnl, 2) if sol_price_for_pnl else 0
+            portfolio_pnl_usd = round(current_usd - deposited_usd, 2)
+            portfolio_pnl_sol = round(portfolio_pnl_usd / sol_price_for_pnl, 6) if sol_price_for_pnl else None
 
     # Active dev-mint cooldowns + blocklist
     cooldowns = active_cooldowns(pool_mem)
