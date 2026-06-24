@@ -772,8 +772,9 @@ function renderPositions(positions){
     const hold=p.deployed_at?tm((Date.now()-new Date(p.deployed_at).getTime())/60000):'—';
     const rangeW=(p.bins_below||0)*(p.bin_step||100)/100;
     const oor=!!p.out_of_range_since;
+    const trail=p.trailing_active;
     return `<div class="pos-card">
-      <div class="pos-status ${oor?'down':'neutral'}"><span class="dir">${oor?'OOR':'IN RANGE'}</span><span class="held">${hold}</span></div>
+      <div class="pos-status ${oor?'down':'neutral'}"><span class="dir">${oor?'OOR':'IN RANGE'}${trail?' 🔻Trail':''}</span><span class="held">${hold}</span></div>
       <div class="pos-body">
         <div class="pos-name">${p.pair}</div>
         <div class="pos-addr">${p.address}</div>
@@ -781,6 +782,7 @@ function renderPositions(positions){
         <div class="pos-row"><span class="k">Value</span><span class="v">${p.total_value_usd!=null?'$'+f(p.total_value_usd):'—'}${p.total_value_sol!=null?' ('+f(p.total_value_sol,6)+' SOL)':''}</span></div>
         <div class="pos-row"><span class="k">Unrealized PnL</span><span class="v ${p.unrealized_pnl_usd>=0?'grn':'red'}">${p.unrealized_pnl_usd!=null?usd(p.unrealized_pnl_usd):'—'}${p.unrealized_pnl_pct!=null?` (${p.unrealized_pnl_pct>=0?'+':''}${f(p.unrealized_pnl_pct)}%)`:''}</span></div>
         ${p.unrealized_pnl_sol!=null?`<div class="pos-row"><span class="k">PnL (SOL)</span><span class="v ${p.unrealized_pnl_sol>=0?'grn':'red'}">${sol(p.unrealized_pnl_sol)}</span></div>`:''}
+        ${trail?`<div class="pos-row"><span class="k">Trailing</span><span class="v org">Peak ${p.peak_pnl_pct!=null?f(p.peak_pnl_pct)+'%':'?'}</span></div>`:''}
         <div class="pos-row"><span class="k">Unclaimed Fees</span><span class="v cyan">${p.unclaimed_fees_usd!=null?'$'+f(p.unclaimed_fees_usd,2):'—'}${p.unclaimed_fees_sol!=null?' ('+f(p.unclaimed_fees_sol,6)+' SOL)':''}</span></div>
         <div class="pos-row"><span class="k">Range</span><span class="v">${p.bins_below}d × ${p.bin_step} step = ${rangeW.toFixed(0)}%</span></div>
         <div class="pos-row"><span class="k">Organic</span><span class="v">${p.organic_score||'—'}/100</span></div>
