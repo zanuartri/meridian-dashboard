@@ -676,6 +676,7 @@ function renderStats(d){
   const unclaimed=d.unclaimed_fees_usd||0;
   const unclaimedSol=d.unclaimed_fees_sol||0;
   const realPnl=d.real_pnl_usd||0;
+  const totalPnlSol=d.net_pnl_sol||0;
   const ds=d.deposit_stats||{};
   const depAvg=ds.avg_price||0;
   const depCount=ds.count||0;
@@ -698,7 +699,7 @@ function renderStats(d){
     <div class="stat"><div class="stat-l">Net PnL</div><div class="stat-v ${pnlColor}">${usd(pnl)}</div><div class="stat-sub">${sol(pnlSol)}</div></div>
     <div class="stat"><div class="stat-l">Avg Win</div><div class="stat-v grn">$${f(aw)}</div><div class="stat-sub">per win</div></div>
     <div class="stat"><div class="stat-l">Avg Loss</div><div class="stat-v red">${usd(al)}</div><div class="stat-sub">per loss</div></div>
-    <div class="stat"><div class="stat-l">Real PnL</div><div class="stat-v ${realPnlColor}">${usd(realPnl)}</div><div class="stat-sub">SOL gains @ today</div></div>
+    <div class="stat"><div class="stat-l">LP Gains</div><div class="stat-v ${realPnlColor}">${usd(realPnl)}</div><div class="stat-sub">${f(totalPnlSol,4)} SOL @ $${f(solPrice,0)}</div></div>
     <div class="stat"><div class="stat-l">Portfolio<span class="stat-info" onclick="showPortfolioModal()" title="Portfolio breakdown">i</span></div><div class="stat-v ${portColor}">${portfolioUsd!=null?usd(portfolioUsd):'—'}</div><div class="stat-sub">${portfolioTotal!=null?'$'+f(portfolioTotal,0)+' now':''}${ds.total_usd?' / $'+f(ds.total_usd,0)+' in':''}</div></div>
   `;
   $('#statRow').innerHTML=statsHtml;
@@ -1241,7 +1242,7 @@ function syncLearnHeights(){
 function renderTbl(){
   const s=(pgCur-1)*pgSz,e=Math.min(s+pgSz,allH.length);
   const page=allH.slice(s,e);
-  let h='<table><thead><tr><th>Pool</th><th>Size</th><th>PnL</th><th>SOL</th><th>Real PnL</th><th>Hold</th><th>Date</th></tr></thead><tbody>';
+  let h='<table><thead><tr><th>Pool</th><th>Size</th><th>PnL</th><th>SOL</th><th>SOL Gains (USD)</th><th>Hold</th><th>Date</th></tr></thead><tbody>';
   for(const t of page){
     const dt=t.recorded_at?wibDateShort(t.recorded_at):'—';
     const p=t.pnl_usd||0,pct=t.pnl_pct||0;
