@@ -156,15 +156,8 @@ def fetch_wallet_rpc():
         lamports = balance_result["result"]["value"]
         sol = lamports / 1e9
 
-        # Get SOL price via CoinGecko
-        price_url = "https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd"
-        try:
-            price_req = urllib.request.Request(price_url)
-            price_resp = urllib.request.urlopen(price_req, timeout=10)
-            price_data = json.loads(price_resp.read())
-            sol_price = float(price_data["solana"]["usd"])
-        except:
-            sol_price = 0
+        # Get SOL price (cached, with Jupiter fallback)
+        sol_price = get_sol_price()
 
         sol_usd = sol * sol_price
 
@@ -238,16 +231,39 @@ def fetch_wallet_rpc():
         print(f"[RPC] Error fetching wallet balance: {e}")
         return None
 
+_sol_price_cache = {"price": 0, "ts": 0}  # cache for 60s to avoid CoinGecko 429
+
 def get_sol_price():
-    """Fetch current SOL price from CoinGecko. Returns float or 0."""
+    """Fetch current SOL price from CoinGecko. Cached for 60s. Falls back to Jupiter."""
+    import time
+    now = time.time()
+    if _sol_price_cache["price"] > 0 and now - _sol_price_cache["ts"] < 60:
+        return _sol_price_cache["price"]
+    # Try CoinGecko first
     try:
         url = "https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd"
-        req = urllib.request.Request(url)
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         resp = urllib.request.urlopen(req, timeout=10)
         data = json.loads(resp.read())
-        return float(data["solana"]["usd"])
-    except:
-        return 0
+        price = float(data["solana"]["usd"])
+        _sol_price_cache["price"] = price
+        _sol_price_cache["ts"] = now
+        return price
+    except Exception as e:
+        print(f"[SOL_PRICE] CoinGecko error: {type(e).__name__}: {e}")
+    # Fallback: Jupiter price API
+    try:
+        url = "https://api.jup.ag/price/v2?ids=So11111111111111111111111111111111111111112"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        resp = urllib.request.urlopen(req, timeout=10)
+        data = json.loads(resp.read())
+        price = float(data["data"]["So11111111111111111111111111111111111111112"]["price"])
+        _sol_price_cache["price"] = price
+        _sol_price_cache["ts"] = now
+        return price
+    except Exception as e2:
+        print(f"[SOL_PRICE] Jupiter fallback error: {type(e2).__name__}: {e2}")
+    return _sol_price_cache["price"] or 0
 DEPOSITS_FILE = MERIDIAN / "deposits.json"
 DEPOSIT_CACHE_TTL = 3600  # refresh at most once per hour
 
@@ -747,41 +763,23 @@ async def dashboard():
             wallet = wb.get("wallet", "") or wallet
 
     # Net worth = tokens holding (wallet) + open positions + rent fees.
-    # Position value: prefer last_total_value_usd, fallback to amount_sol × sol_price
+    # Position value: prefer last_total_value_usd (on-chain from SDK), fallback to amount_sol × sol_price
     sol_price = wallet_balance.get("sol_price") if wallet_balance else 0
     positions_value = 0
     rent_sol_total = 0
     for p in active:
-        val_usd = p.get("total_value_usd")
+        # SDK writes last_total_value_usd; total_value_usd may not exist
+        val_usd = p.get("last_total_value_usd") or p.get("total_value_usd")
         if val_usd is None or val_usd == 0:
             # Fallback: use amount_sol from state.json
             amount_sol = p.get("amount_sol", 0) or 0
             val_usd = amount_sol * sol_price if sol_price else 0
         positions_value += (val_usd or 0)
     
-    # Rent: query on-chain via Helius RPC for each position
-    rent_sol_total = 0
-    if rpc_enabled:
-        for p in active:
-            pos_addr = p.get("address")
-            if not pos_addr:
-                continue
-            try:
-                rent_payload = {
-                    "jsonrpc": "2.0",
-                    "id": 1,
-                    "method": "getMinimumBalanceForRentExemption",
-                    "params": [3228]  # DLMM position account size
-                }
-                rent_data = json.dumps(rent_payload).encode("utf-8")
-                rpc_url = f"https://mainnet.helius-rpc.com/?api-key={HELIUS_API_KEY}"
-                rent_req = urllib.request.Request(rpc_url, data=rent_data, headers={"Content-Type": "application/json"})
-                rent_resp = urllib.request.urlopen(rent_req, timeout=10)
-                rent_result = json.loads(rent_resp.read())
-                rent_lamports = rent_result.get("result", 0)
-                rent_sol_total += rent_lamports / 1e9
-            except:
-                rent_sol_total += 0.057  # Fallback estimate
+    # Rent: each DLMM position locks ~0.057 SOL for rent exemption (account size 3228 bytes)
+    # This is a protocol constant — no need to query on-chain per position
+    RENT_PER_POSITION_SOL = 0.057406  # getMinimumBalanceForRentExemption(3228) / 1e9
+    rent_sol_total = len(active) * RENT_PER_POSITION_SOL
     
     rent_usd = round(rent_sol_total * sol_price, 2) if sol_price else 0
     total_equity = None
@@ -819,8 +817,8 @@ async def dashboard():
         # positions Sol is what was deployed INTO LP positions.
         # Use last_total_value_usd from state.json (on-chain value) instead of amount_sol fallback.
         for p in active:
-            # Prefer on-chain value: last_total_value_usd / sol_price
-            pv_usd = p.get("total_value_usd")
+            # Prefer on-chain value: last_total_value_usd / sol_price (SDK writes this field)
+            pv_usd = p.get("last_total_value_usd") or p.get("total_value_usd")
             if pv_usd and sol_price_for_pnl:
                 pv = pv_usd / sol_price_for_pnl
             else:

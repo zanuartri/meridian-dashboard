@@ -1046,6 +1046,7 @@ async function loadPoolCandidates(){
   const orgVals=candidates.map(c=>c.organic_score??c.organic??(c.base&&c.base.organic)).filter(v=>v!=null);
   const avgOrganic=orgVals.length?orgVals.reduce((a,v)=>a+v,0)/orgVals.length:null;
   const avgFeeTvl=candidates.length?candidates.reduce((a,c)=>a+(c.fee_active_tvl_ratio||c.fee_tvl_ratio||0),0)/candidates.length:0;
+  const gmgnCount=candidates.filter(c=>c.gmgn_enriched).length;
   
   const timeAgo=updatedAt?ago(updatedAt):'never';
   
@@ -1054,13 +1055,14 @@ async function loadPoolCandidates(){
     <div class="stat"><div class="stat-l">Total Volume</div><div class="stat-v">$${fmtK(totalVol)}</div></div>
     <div class="stat"><div class="stat-l">Avg Organic</div><div class="stat-v ${avgOrganic==null?'':(avgOrganic>=60?'grn':'red')}">${avgOrganic==null?'—':avgOrganic.toFixed(0)}</div></div>
     <div class="stat"><div class="stat-l">Avg Fee/TVL</div><div class="stat-v ${avgFeeTvl>=0.05?'grn':'red'}">${(avgFeeTvl*100).toFixed(2)}%</div></div>
+    ${gmgnCount>0?`<div class="stat"><div class="stat-l">GMGN Enriched</div><div class="stat-v cyan">${gmgnCount}/${total}</div></div>`:''}
   `;
   $('#candCount').textContent=total+' candidates';
   
   // Table
   if(!candidates.length){$('#candPoolTbl').innerHTML='<div style="padding:24px;text-align:center;color:var(--t4);font-family:var(--mono);font-size:11px">No cached candidates yet. Run /screen in Meridian.</div>';return;}
   
-  let h='<table><thead><tr><th>Pool</th><th style="text-align:center">Volume</th><th style="text-align:center">Organic</th><th style="text-align:center">Fee/TVL</th><th style="text-align:center">Active%</th><th style="text-align:center">Holders</th><th style="text-align:center">Source</th></tr></thead><tbody>';
+  let h='<table><thead><tr><th>Pool</th><th style="text-align:center">Volume</th><th style="text-align:center">Organic</th><th style="text-align:center">Fee/TVL</th><th style="text-align:center">Active%</th><th style="text-align:center">Holders</th><th style="text-align:center" title="GMGN smart wallets">Smart</th><th style="text-align:center" title="GMGN bot/degen %">Bot%</th><th style="text-align:center" title="GMGN top-10 holder %">Top10%</th><th style="text-align:center" title="GMGN total fees SOL">Fees</th><th style="text-align:center">Source</th></tr></thead><tbody>';
   for(const c of candidates){
     const name=c.pool_name||c.name||c.base_mint?.slice(0,6)+'?'||'?';
     const vol=c.volume_window||c.volume_24h||c.volume||0;
@@ -1068,7 +1070,11 @@ async function loadPoolCandidates(){
     const feeTvl=c.fee_active_tvl_ratio||c.fee_tvl_ratio||0;
     const active=c.active_pct;
     const holders=c.holder_count||c.holders||0;
-    const src=c.source||(c.gmgn?'GMGN':'Meteora');
+    const src=c.gmgn_enriched?'Hybrid':(c.source||(c.gmgn?'GMGN':'Meteora'));
+    const smart=c.gmgn_smart_wallets!=null?c.gmgn_smart_wallets:'—';
+    const botPct=c.gmgn_bot_degen_pct!=null?c.gmgn_bot_degen_pct.toFixed(0)+'%':'—';
+    const top10Pct=c.gmgn_top10_holder_pct!=null?c.gmgn_top10_holder_pct.toFixed(0)+'%':'—';
+    const gmgnFees=c.gmgn_total_fee_sol!=null?c.gmgn_total_fee_sol.toFixed(1)+'S':'—';
     h+=`<tr>
       <td class="pn" style="white-space:nowrap"><a href="https://app.meteora.ag/dlmm/${c.pool_address||c.pool||''}" target="_blank" style="color:var(--tx);text-decoration:none">${name}</a></td>
       <td style="text-align:center">$${fmtK(vol)}</td>
@@ -1076,7 +1082,11 @@ async function loadPoolCandidates(){
       <td style="text-align:center" class="${feeTvl>=0.05?'grn':'red'}">${(feeTvl*100).toFixed(2)}%</td>
       <td style="text-align:center">${active==null?'—':active+'%'}</td>
       <td style="text-align:center">${holders}</td>
-      <td style="text-align:center;color:var(--t3)">${src}</td>
+      <td style="text-align:center;color:var(--t3)">${smart}</td>
+      <td style="text-align:center;color:${c.gmgn_bot_degen_pct!=null&&c.gmgn_bot_degen_pct>30?'red':'var(--t3)'}">${botPct}</td>
+      <td style="text-align:center;color:${c.gmgn_top10_holder_pct!=null&&c.gmgn_top10_holder_pct>50?'red':'var(--t3)'}">${top10Pct}</td>
+      <td style="text-align:center;color:var(--t3)">${gmgnFees}</td>
+      <td style="text-align:center;color:${src==='Hybrid'?'var(--cyan)':'var(--t3)'}">${src}</td>
     </tr>`;
   }
   h+='</tbody></table>';
