@@ -817,8 +817,14 @@ async def dashboard():
         # Add CURRENT value of open positions in SOL (total_value_sol reflects unrealized PnL; fallback amount_sol)
         # This avoids double-counting: wallet SOL is POST-deploy (what's left),
         # positions Sol is what was deployed INTO LP positions.
+        # Use last_total_value_usd from state.json (on-chain value) instead of amount_sol fallback.
         for p in active:
-            pv = (p.get("total_value_sol") or p.get("amount_sol", 0) or 0)
+            # Prefer on-chain value: last_total_value_usd / sol_price
+            pv_usd = p.get("total_value_usd")
+            if pv_usd and sol_price_for_pnl:
+                pv = pv_usd / sol_price_for_pnl
+            else:
+                pv = (p.get("total_value_sol") or p.get("amount_sol", 0) or 0)
             current_sol += pv
             comp_positions_sol += pv
         
