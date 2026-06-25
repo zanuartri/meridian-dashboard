@@ -593,6 +593,16 @@ const sol=n=>n==null||isNaN(n)?'—':(n>=0?'+':'')+Number(n).toFixed(6)+' SOL';
 const tm=m=>{if(!m)return'—';m=Math.round(m);return m<60?m+'m':(m/60).toFixed(1)+'h';};
 const cc=n=>n>0?'w':n<0?'l':'z';
 
+// WIB (GMT+7) helpers
+const WIB_TZ='Asia/Jakarta';
+const wibOpts={timeZone:WIB_TZ};
+const wibDate=(d)=>new Date(d).toLocaleDateString('en-US',{...wibOpts,month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+const wibTime=()=>new Date().toLocaleTimeString('en-US',{...wibOpts,hour:'2-digit',minute:'2-digit'});
+const wibDateShort=(d)=>new Date(d).toLocaleString('en-US',{...wibOpts,month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+const wibToday=()=>{const d=new Date(new Date().toLocaleString('en-US',{timeZone:WIB_TZ}));return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
+const wibDateStr=(d)=>{const dt=new Date(d instanceof Date?d:new Date(d));const w=new Date(dt.toLocaleString('en-US',{timeZone:WIB_TZ}));return `${w.getFullYear()}-${String(w.getMonth()+1).padStart(2,'0')}-${String(w.getDate()).padStart(2,'0')}`;};
+const wibNow=()=>new Date(new Date().toLocaleString('en-US',{timeZone:WIB_TZ}));
+
 let allH=[],pgSz=15,pgCur=1,data=null,curPage='overview';
 let dailyView='usd',calView='usd',perfView='usd';
 let charts={};
@@ -640,7 +650,7 @@ $$('.nav-i').forEach(el=>{
 async function load(){
   data=await fj('/api/dashboard');if(!data)return;
   const d=data;
-  $('#sbTime').textContent=new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+  $('#sbTime').textContent=wibTime();
   $('#pillStrategy').textContent=(d.config?.strategy||'—').toUpperCase();
   renderStats(d);
   _lastPortfolioComponents=d.portfolio_components||null;
@@ -807,7 +817,7 @@ function renderPositions(positions){
   $('#posCountPage').textContent=count+' active positions';
   if(!count){el.innerHTML='<div class="pos-empty">No active positions — waiting for screening cycle</div>';return;}
   el.innerHTML=positions.map(p=>{
-    const dep=p.deployed_at?new Date(p.deployed_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
+    const dep=p.deployed_at?wibDateShort(p.deployed_at):'—';
     const hold=p.deployed_at?tm((Date.now()-new Date(p.deployed_at).getTime())/60000):'—';
     const rangeW=(p.bins_below||0)*(p.bin_step||100)/100;
     const oor=!!p.out_of_range_since;
@@ -862,7 +872,7 @@ function renderRecentTrades(history){
     const pnl=t.pnl_usd||0,pct=t.pnl_pct||0;
     const pnlSol=t.pnl_sol||0;
     const feesSol=t.fees_sol||0;
-    const dt=t.recorded_at?new Date(t.recorded_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
+    const dt=t.recorded_at?wibDateShort(t.recorded_at):'—';
     const r=(t.close_reason||'—');const sr=r.length>20?r.slice(0,20)+'…':r;
     return `<div class="trade-item"><div class="trade-info"><div class="trade-pair">${t.pool_name||'—'}</div><div class="trade-meta">${tm(t.minutes_held)} • ${sr} • ${dt}</div></div><div><div class="trade-pnl ${pnl>=0?'grn':'red'}">${usd(pnl)} <span style="font-size:10px;opacity:.7">${pnlSol>=0?'+':''}${pnlSol.toFixed(4)} SOL</span></div><div class="trade-pnl-sub">${pct>=0?'+':''}${f(pct)}% • fees ${f(feesSol,6)} SOL</div></div></div>`;
   }).join('');
@@ -918,7 +928,7 @@ function renderStatus(d){
 }
 
 // ═══ CALENDAR ═══
-let calDaily={},calByDay={},calYear=new Date().getFullYear(),calMonth=new Date().getMonth(),calSelDate=new Date().toISOString().slice(0,10);
+let calDaily={},calByDay={},calYear=wibNow().getFullYear(),calMonth=wibNow().getMonth(),calSelDate=wibToday();
 async function loadCalendar(){
   const d=await fj('/api/calendar');if(!d)return;
   calDaily={};calByDay=d.by_day||{};
@@ -935,7 +945,7 @@ function renderCalendar(){
   const startDay=first.getDay();
   const totalDays=last.getDate();
   const today=new Date();
-  const todayStr=today.toISOString().slice(0,10);
+  const todayStr=wibToday();
   // Monthly stats
   let monthPnl=0,monthTrades=0,monthWins=0,monthDays=0;
   let monthPnlSol=0;
@@ -994,7 +1004,7 @@ function renderCalendar(){
 function renderCalPositions(){
   const el=$('#calPositions');
   const positions=calByDay[calSelDate]||[];
-  const dateLabel=new Date(calSelDate+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'});
+  const dateLabel=new Date(calSelDate+'T12:00:00').toLocaleDateString('en-US',{timeZone:WIB_TZ,weekday:'short',month:'short',day:'numeric',year:'numeric'});
   if(!positions.length){
     el.innerHTML=`<div class="cal-positions"><h3>${dateLabel}</h3><div class="cal-pos-empty">No positions on this day</div></div>`;
     return;
@@ -1111,7 +1121,7 @@ function renderCandTbl(){
   const page=allCfiltered.slice(s,e);
   let h='<table><thead><tr><th>Pool</th><th>Type</th><th>Details</th><th>Risks</th><th>Date</th></tr></thead><tbody>';
   for(const dec of page){
-    const ts=dec.ts?new Date(dec.ts).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
+    const ts=dec.ts?wibDateShort(dec.ts):'—';
     const tp=dec.type||'skip';
     const tpCls=tp==='deploy'?'grn':tp==='close'?'cyn':tp==='no_deploy'?'red':'z';
     const pool=dec.pool_display||'—';
@@ -1181,7 +1191,7 @@ async function loadLearning(){
   if(lessons.length){
     $('#lessonsList').innerHTML=lessons.slice(0,15).map(l=>{
       const outcome=l.outcome||'neutral';
-      const ts=l.created_at?new Date(l.created_at).toLocaleString('en-US',{month:'short',day:'numeric'}):'';
+      const ts=l.created_at?wibDateShort(l.created_at):'';
       return `<div class="learn-item"><div class="learn-rule">${l.rule||'—'}</div><div class="learn-meta"><span class="learn-outcome ${outcome}">${outcome}</span>${l.pnl_pct!=null?`PnL: ${l.pnl_pct}%`:''}${l.confidence?`Conf: ${(l.confidence*100).toFixed(0)}%`:''}${ts?`<span style="margin-left:auto;color:var(--t4)">${ts}</span>`:''}</div></div>`;
     }).join('');
   }else{$('#lessonsList').innerHTML='<div style="color:var(--t4);font-size:11px;font-family:var(--mono)">No lessons recorded yet</div>';}
@@ -1233,7 +1243,7 @@ function renderTbl(){
   const page=allH.slice(s,e);
   let h='<table><thead><tr><th>Pool</th><th>Size</th><th>PnL</th><th>SOL</th><th>Real PnL</th><th>Hold</th><th>Date</th></tr></thead><tbody>';
   for(const t of page){
-    const dt=t.recorded_at?new Date(t.recorded_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
+    const dt=t.recorded_at?wibDateShort(t.recorded_at):'—';
     const p=t.pnl_usd||0,pct=t.pnl_pct||0;
     const pnlSol=t.pnl_sol||0;
     const realPnl=t.real_pnl_usd;

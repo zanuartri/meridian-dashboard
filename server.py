@@ -645,12 +645,17 @@ async def dashboard():
     sl_count = sum(1 for p in closed if "stop loss" in (p.get("close_reason") or "").lower())
     oor_count = sum(1 for p in closed if "rule 3" in (p.get("close_reason") or "").lower() or "rule 4" in (p.get("close_reason") or "").lower() or "pumped" in (p.get("close_reason") or "").lower())
 
-    # Daily PnL for chart
+    # Daily PnL for chart (WIB timezone)
+    WIB_OFFSET = timedelta(hours=7)
     daily = {}
     for p in closed:
         ts = p.get("recorded_at", "")
         if not ts: continue
-        day = ts[:10]
+        try:
+            dt = datetime.fromisoformat(ts.replace("Z", "+00:00")) + WIB_OFFSET
+            day = dt.strftime("%Y-%m-%d")
+        except:
+            day = ts[:10]
         if day not in daily:
             daily[day] = {"date": day, "pnl_usd": 0, "pnl_sol": 0, "trades": 0, "wins": 0, "fees": 0, "fees_sol": 0}
         daily[day]["pnl_usd"] += p.get("pnl_usd", 0) or 0
@@ -1188,12 +1193,20 @@ async def calendar():
     perf = lessons.get("performance", []) if isinstance(lessons, dict) else []
     closed = [p for p in perf if isinstance(p, dict)]
 
-    # Build daily data
+    # Build daily data (WIB timezone)
+    WIB_OFFSET = timedelta(hours=7)
+    def _wib_day(ts_str):
+        try:
+            dt = datetime.fromisoformat(ts_str.replace("Z", "+00:00")) + WIB_OFFSET
+            return dt.strftime("%Y-%m-%d")
+        except:
+            return ts_str[:10]
+
     daily = {}
     for p in closed:
         ts = p.get("recorded_at", "")
         if not ts: continue
-        day = ts[:10]
+        day = _wib_day(ts)
         if day not in daily:
             daily[day] = {"date": day, "pnl_usd": 0, "pnl_sol": 0, "trades": 0, "wins": 0, "fees": 0, "fees_sol": 0, "positions": 0}
         daily[day]["pnl_usd"] += p.get("pnl_usd", 0) or 0
@@ -1210,7 +1223,7 @@ async def calendar():
     for p in closed:
         ts = p.get("recorded_at", "")
         if not ts: continue
-        day = ts[:10]
+        day = _wib_day(ts)
         if day in daily:
             daily[day]["positions"] = daily[day].get("positions", 0) + 1
 
@@ -1219,7 +1232,7 @@ async def calendar():
     for p in closed:
         ts = p.get("recorded_at", "")
         if not ts: continue
-        day = ts[:10]
+        day = _wib_day(ts)
         if day not in by_day: by_day[day] = []
         pnl = p.get("pnl_pct", 0) or 0
         by_day[day].append({
