@@ -63,6 +63,22 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
 .stat-v.grn{color:var(--grn)}.stat-v.red{color:var(--red)}.stat-v.blue{color:var(--blue)}.stat-v.org{color:var(--orange)}.stat-v.cyan{color:var(--cyan)}.stat-v.pur{color:var(--purple)}
 .cfg-val.grn,.trade-pair .grn{color:var(--grn)}.cfg-val.red,.trade-pair .red{color:var(--red)}.cfg-val.blue,.trade-pair .blue{color:var(--blue)}.cfg-val.cyan,.trade-pair .cyan{color:var(--cyan)}.cfg-val.warn{color:var(--orange)}
 .stat-sub{font-family:var(--mono);font-size:10px;color:var(--t4);margin-top:4px;white-space:nowrap}
+.stat-info{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;background:var(--bg4);color:var(--t4);font-size:9px;font-weight:700;cursor:pointer;margin-left:4px;flex-shrink:0;transition:all .15s}
+.stat-info:hover{background:var(--blue);color:#fff}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:999;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal-box{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:20px;min-width:320px;max-width:420px;font-family:var(--mono);font-size:12px;color:var(--tx)}
+.modal-box h3{margin:0 0 14px;font-size:13px;color:var(--t2);display:flex;justify-content:space-between;align-items:center}
+.modal-box .modal-close{cursor:pointer;color:var(--t4);font-size:16px;padding:2px 6px;border-radius:4px}
+.modal-box .modal-close:hover{background:var(--bg4);color:var(--tx)}
+.modal-row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border)}
+.modal-row:last-child{border-bottom:none}
+.modal-row .mk{color:var(--t3)}
+.modal-row .mv{font-weight:600}
+.modal-row.mv-grn .mv{color:var(--grn)}
+.modal-row.mv-red .mv{color:var(--red)}
+.modal-row.mv-cyan .mv{color:var(--cyan)}
+.modal-sep{border-top:1px solid var(--border);margin:6px 0}
 .econ-head{display:flex;justify-content:space-between;align-items:center;margin:0 0 8px;gap:8px}
 .econ-head h3{font-family:var(--mono);font-size:10px;font-weight:500;color:var(--t3);text-transform:uppercase;letter-spacing:.5px}
 .econ-help-btn{font-family:var(--mono);font-size:11px;color:var(--t3);background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:4px 10px;cursor:pointer;white-space:nowrap;position:relative}
@@ -627,6 +643,7 @@ async function load(){
   $('#sbTime').textContent=new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
   $('#pillStrategy').textContent=(d.config?.strategy||'—').toUpperCase();
   renderStats(d);
+  _lastPortfolioComponents=d.portfolio_components||null;
   renderChart(d.daily);
   renderDailyChart(d.daily);
   renderWinChart(d);
@@ -672,9 +689,31 @@ function renderStats(d){
     <div class="stat"><div class="stat-l">Avg Win</div><div class="stat-v grn">$${f(aw)}</div><div class="stat-sub">per win</div></div>
     <div class="stat"><div class="stat-l">Avg Loss</div><div class="stat-v red">${usd(al)}</div><div class="stat-sub">per loss</div></div>
     <div class="stat"><div class="stat-l">Real PnL</div><div class="stat-v ${realPnlColor}">${usd(realPnl)}</div><div class="stat-sub">SOL gains @ today</div></div>
-    <div class="stat"><div class="stat-l">Portfolio</div><div class="stat-v ${portColor}">${portfolioUsd!=null?usd(portfolioUsd):'—'}</div><div class="stat-sub">${portfolioTotal!=null?'$'+f(portfolioTotal,0)+' now':''}${ds.total_usd?' / $'+f(ds.total_usd,0)+' in':''}</div></div>
+    <div class="stat"><div class="stat-l">Portfolio<span class="stat-info" onclick="showPortfolioModal()" title="Portfolio breakdown">i</span></div><div class="stat-v ${portColor}">${portfolioUsd!=null?usd(portfolioUsd):'—'}</div><div class="stat-sub">${portfolioTotal!=null?'$'+f(portfolioTotal,0)+' now':''}${ds.total_usd?' / $'+f(ds.total_usd,0)+' in':''}</div></div>
   `;
   $('#statRow').innerHTML=statsHtml;
+}
+let _lastPortfolioComponents=null;
+function showPortfolioModal(){
+  const c=_lastPortfolioComponents;if(!c)return;
+  const pColor=c.current_usd>=c.deposited_usd?'grn':'red';
+  const rows=[
+    ['Wallet SOL',c.wallet_sol.toFixed(4)+' SOL','$'+f(c.wallet_sol*c.sol_price)],
+    ['Positions SOL',c.positions_sol.toFixed(4)+' SOL','$'+f(c.positions_sol*c.sol_price)],
+    ['Tokens',c.tokens_usd>0?'$'+f(c.tokens_usd):'—',c.tokens_usd>0?(c.tokens_usd/c.sol_price).toFixed(4)+' SOL':'—'],
+    ['Rent',c.rent_sol.toFixed(4)+' SOL','$'+f(c.rent_sol*c.sol_price)],
+  ];
+  let h=rows.map(r=>`<div class="modal-row"><span class="mk">${r[0]}</span><span class="mv">${r[1]} <span style="color:var(--t4);font-size:10px">(${r[2]})</span></span></div>`).join('');
+  h+=`<div class="modal-sep"></div>`;
+  h+=`<div class="modal-row"><span class="mk">Current Total</span><span class="mv">${c.current_sol.toFixed(4)} SOL <span style="color:var(--t4);font-size:10px">($${f(c.current_usd)})</span></span></div>`;
+  h+=`<div class="modal-sep"></div>`;
+  h+=`<div class="modal-row"><span class="mk">Deposited</span><span class="mv">${c.deposited_sol.toFixed(4)} SOL <span style="color:var(--t4);font-size:10px">($${f(c.deposited_usd)} @ $${f(c.avg_deposit_price)}/SOL)</span></span></div>`;
+  h+=`<div class="modal-row"><span class="mk">SOL Price</span><span class="mv">$${f(c.sol_price)}</span></div>`;
+  h+=`<div class="modal-sep"></div>`;
+  const pnl=c.current_usd-c.deposited_usd;
+  h+=`<div class="modal-row ${pnl>=0?'mv-grn':'mv-red'}"><span class="mk">Portfolio PnL</span><span class="mv">${pnl>=0?'+':''}$${f(pnl)}</span></div>`;
+  $('#portfolioModalBody').innerHTML=h;
+  $('#portfolioModal').classList.add('open');
 }
 function renderChart(daily){
   if(!daily||!daily.length){$('#perfChart').parentElement.innerHTML='<div class="chart-empty">No data</div>';return;}
@@ -1254,5 +1293,11 @@ mobNav.querySelectorAll('.mob-nav-i').forEach(el=>{
   });
 });
 </script>
+<div class="modal-overlay" id="portfolioModal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal-box">
+    <h3>Portfolio Breakdown <span class="modal-close" onclick="document.getElementById('portfolioModal').classList.remove('open')">✕</span></h3>
+    <div id="portfolioModalBody"></div>
+  </div>
+</div>
 </body>
 </html>

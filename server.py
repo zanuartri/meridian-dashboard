@@ -773,10 +773,16 @@ async def dashboard():
     portfolio_pnl_sol = None
     portfolio_pnl_usd = None
     portfolio_total_usd = None
+    portfolio_components = None
     if deposit_stats and deposit_stats.get("total_sol", 0) > 0 and wallet:
         current_sol = 0
+        comp_wallet_sol = 0
+        comp_positions_sol = 0
+        comp_tokens_usd = 0
+        comp_rent_sol = 0
         if wallet_balance and wallet_balance.get("sol"):
             current_sol = wallet_balance["sol"]
+            comp_wallet_sol = wallet_balance["sol"]
         elif ALCHEMY_API_KEY:
             try:
                 rpc_url = f"https://solana-mainnet.g.alchemy.com/v2/{ALCHEMY_API_KEY}"
@@ -792,11 +798,14 @@ async def dashboard():
         # This avoids double-counting: wallet SOL is POST-deploy (what's left),
         # positions Sol is what was deployed INTO LP positions.
         for p in active:
-            current_sol += (p.get("total_value_sol") or p.get("amount_sol", 0) or 0)
+            pv = (p.get("total_value_sol") or p.get("amount_sol", 0) or 0)
+            current_sol += pv
+            comp_positions_sol += pv
         
         # Add rent fees (SOL locked in rent)
         if rent_sol_total > 0:
             current_sol += rent_sol_total
+            comp_rent_sol = rent_sol_total
         
         # Add token holdings value (convert USD → SOL)
         if wallet_balance:
@@ -813,6 +822,7 @@ async def dashboard():
                 pass
             tokens_sol = (tokens_usd + usdc) / sol_price_for_pnl if sol_price_for_pnl else 0
             current_sol += tokens_sol
+            comp_tokens_usd = tokens_usd + usdc
         
         if current_sol > 0:
             deposited_usd = deposit_stats.get("total_usd", 0)
@@ -820,6 +830,18 @@ async def dashboard():
             portfolio_pnl_usd = round(current_usd - deposited_usd, 2)
             portfolio_pnl_sol = round(portfolio_pnl_usd / sol_price_for_pnl, 6) if sol_price_for_pnl else None
             portfolio_total_usd = current_usd
+            portfolio_components = {
+                "wallet_sol": round(comp_wallet_sol, 4),
+                "positions_sol": round(comp_positions_sol, 4),
+                "tokens_usd": round(comp_tokens_usd, 2),
+                "rent_sol": round(comp_rent_sol, 4),
+                "current_sol": round(current_sol, 4),
+                "current_usd": current_usd,
+                "deposited_sol": deposit_stats.get("total_sol", 0),
+                "deposited_usd": deposited_usd,
+                "avg_deposit_price": deposit_stats.get("avg_price", 0),
+                "sol_price": sol_price_for_pnl,
+            }
 
     # Active dev-mint cooldowns + blocklist
     cooldowns = active_cooldowns(pool_mem)
@@ -852,6 +874,7 @@ async def dashboard():
         "portfolio_pnl_sol": portfolio_pnl_sol,
         "portfolio_pnl_usd": portfolio_pnl_usd,
         "portfolio_total_usd": portfolio_total_usd if portfolio_total_usd else None,
+        "portfolio_components": portfolio_components,
          "real_pnl_usd": fmt(real_pnl_usd, 2),
         "total_sol_deposited": fmt(total_sol_deposited, 4),
         "avg_deposit_price": fmt(avg_deposit_price, 2),
