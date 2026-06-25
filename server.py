@@ -275,16 +275,43 @@ def get_wallet_addr():
             w = wb.get("wallet", "")
     return w
 
-def fetch_historical_sol_price(date_str):
-    """Fetch SOL price for a specific date (DD-MM-YYYY format) from CoinGecko."""
+_sol_hourly_cache = {}  # { "YYYY-MM-DD": { hour: price } }
+
+def fetch_sol_hourly_prices(date_str):
+    """Fetch all 1h SOL prices for a date (DD-MM-YYYY) from yfinance.
+    Returns dict {hour: close_price}. Caches in memory to avoid repeated calls.
+    """
+    # Convert DD-MM-YYYY to YYYY-MM-DD for yfinance
+    from datetime import datetime as dt
+    d = dt.strptime(date_str, "%d-%m-%Y")
+    yf_date = d.strftime("%Y-%m-%d")
+
+    if yf_date in _sol_hourly_cache:
+        return _sol_hourly_cache[yf_date]
+
     try:
-        url = f"https://api.coingecko.com/api/v3/coins/solana/history?date={date_str}"
-        req = urllib.request.Request(url, headers={"User-Agent": "MeridianDashboard/1.0"})
-        resp = urllib.request.urlopen(req, timeout=10)
-        data = json.loads(resp.read())
-        return float(data.get("market_data", {}).get("current_price", {}).get("usd", 0))
-    except:
-        return 0
+        import yfinance as yf
+        start = yf_date
+        end = (d + timedelta(days=1)).strftime("%Y-%m-%d")
+        hist = yf.Ticker("SOL-USD").history(start=start, end=end, interval="1h")
+        hourly = {}
+        for idx in hist.index:
+            hourly[idx.hour] = float(hist.loc[idx, "Close"])
+        _sol_hourly_cache[yf_date] = hourly
+        return hourly
+    except Exception as e:
+        print(f"[Deposit Price] yfinance error for {date_str}: {e}")
+        return {}
+
+def fetch_historical_sol_price(date_str, hour=None):
+    """Fetch SOL price for a specific date/hour. Falls back to daily open if no hourly data."""
+    hourly = fetch_sol_hourly_prices(date_str)
+    if hour is not None and hour in hourly:
+        return hourly[hour]
+    # Fallback: first available hour or 0
+    if hourly:
+        return next(iter(hourly.values()))
+    return 0
 
 def fetch_deposits():
     """Fetch deposit history via Alchemy RPC (getSignaturesForAddress + getTransaction).
@@ -439,32 +466,20 @@ def fetch_deposits():
 
 
 
-        # Fetch historical SOL prices for new deposits (grouped by date)
+        # Fetch historical SOL prices — 1 yfinance call per unique date
         dates_needed = set()
         for dep in new_deposits:
             dt = datetime.fromtimestamp(dep["ts"], tz=timezone.utc)
             dates_needed.add(dt.strftime("%d-%m-%Y"))
 
-        # Load existing price cache from deposits
-        price_cache = {}
-        for dep in cache["deposits"]:
-            if dep.get("sol_price", 0) > 0:
-                dt = datetime.fromtimestamp(dep["ts"], tz=timezone.utc)
-                price_cache[dt.strftime("%d-%m-%Y")] = dep["sol_price"]
-
-        # Fetch missing prices (with rate limiting)
         for date_str in dates_needed:
-            if date_str not in price_cache:
-                price = fetch_historical_sol_price(date_str)
-                if price > 0:
-                    price_cache[date_str] = price
-                time.sleep(2)  # CoinGecko rate limit: ~1 call per 2 seconds
+            fetch_sol_hourly_prices(date_str)
+            time.sleep(0.3)  # small delay between dates
 
-        # Add prices to new deposits
+        # Assign prices to deposits
         for dep in new_deposits:
             dt = datetime.fromtimestamp(dep["ts"], tz=timezone.utc)
-            date_str = dt.strftime("%d-%m-%Y")
-            dep["sol_price"] = price_cache.get(date_str, 0)
+            dep["sol_price"] = fetch_historical_sol_price(dt.strftime("%d-%m-%Y"), dt.hour)
 
         # Update cache
         cache["deposits"].extend(new_deposits)
