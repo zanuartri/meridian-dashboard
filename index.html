@@ -38,6 +38,10 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
 .nav-i.on svg{opacity:1}
 .sb-ft{padding:12px 16px;border-top:1px solid var(--border);font-family:var(--mono);font-size:9px;color:var(--t4)}
 .sb-ft .live{color:var(--grn)}
+.sb-mode-btn{cursor:pointer;padding:6px 10px;margin-bottom:4px;border-radius:4px;font-size:10px;font-weight:600;color:var(--t4);transition:all 0.2s;letter-spacing:0.5px}
+.sb-mode-btn:hover{color:var(--t1);background:var(--hover)}
+.sb-mode-btn.on{color:var(--grn);background:rgba(0,255,0,0.08)}
+.sb-mode-wrap{display:flex;gap:6px;margin-bottom:8px}
 
 /* ═══ MAIN ═══ */
 .mn{flex:1;padding:20px 24px;overflow-y:auto;min-width:0}
@@ -392,8 +396,11 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
       </div>
     </nav>
     <div class="sb-ft">
-      <div class="live">● LIVE</div>
-      <div style="margin-top:4px" id="sbTime">—</div>
+      <div class="sb-mode-wrap">
+        <div id="btnReal" class="sb-mode-btn on" onclick="event.stopPropagation();setPaperMode(false)">◉ LIVE</div>
+        <div id="btnPaper" class="sb-mode-btn" onclick="event.stopPropagation();setPaperMode(true)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;vertical-align:-1px"><path d="M9 3h6M9 8l-4.95 8A2 2 0 005.74 22h12.52a2 2 0 001.69-2.5L15 8"/></svg> PAPER</div>
+      </div>
+
     </div>
   </aside>
 
@@ -593,18 +600,18 @@ const sol=n=>n==null||isNaN(n)?'—':(n>=0?'+':'')+Number(n).toFixed(6)+' SOL';
 const tm=m=>{if(!m)return'—';m=Math.round(m);return m<60?m+'m':(m/60).toFixed(1)+'h';};
 const cc=n=>n>0?'w':n<0?'l':'z';
 
-// WIB (GMT+7) helpers
-const WIB_TZ='Asia/Jakarta';
-const wibOpts={timeZone:WIB_TZ};
-const wibDate=(d)=>new Date(d).toLocaleDateString('en-US',{...wibOpts,month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
-const wibTime=()=>new Date().toLocaleTimeString('en-US',{...wibOpts,hour:'2-digit',minute:'2-digit'});
-const wibDateShort=(d)=>new Date(d).toLocaleString('en-US',{...wibOpts,month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
-const wibToday=()=>{const d=new Date(new Date().toLocaleString('en-US',{timeZone:WIB_TZ}));return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
-const wibDateStr=(d)=>{const dt=new Date(d instanceof Date?d:new Date(d));const w=new Date(dt.toLocaleString('en-US',{timeZone:WIB_TZ}));return `${w.getFullYear()}-${String(w.getMonth()+1).padStart(2,'0')}-${String(w.getDate()).padStart(2,'0')}`;};
-const wibNow=()=>new Date(new Date().toLocaleString('en-US',{timeZone:WIB_TZ}));
+// UTC helpers (match Meteora/Meridian timezone)
+const utcDate=(d)=>new Date(d).toISOString().replace('T',' ').slice(0,16)+' UTC';
+const utcTime=()=>new Date().toISOString().slice(11,16)+' UTC';
+const utcDateShort=(d)=>new Date(d).toISOString().replace('T',' ').slice(0,16);
+const utcToday=()=>new Date().toISOString().slice(0,10);
+const utcDateStr=(d)=>{const dt=new Date(d instanceof Date?d:new Date(d));return dt.toISOString().slice(0,10);};
+const utcNow=()=>new Date();
 
 let allH=[],pgSz=15,pgCur=1,data=null,curPage='overview';
+let cache={live:null,paper:null};
 let dailyView='usd',calView='usd',perfView='usd';
+let paperMode=false;
 let charts={};
 
 function setDailyView(v){
@@ -628,7 +635,23 @@ function setPerfView(v){
   if(data&&data.daily)renderChart(data.daily);
 }
 
-async function fj(p){try{return(await fetch(p)).json()}catch{return null}}
+async function fj(p){try{const url=paperMode?p+(p.includes('?')?'&':'?')+'paper=true&_='+Date.now():p+'?_='+Date.now();return(await fetch(url)).json()}catch{return null}}
+
+function setPaperMode(v){
+  paperMode=v;
+  data=cache[v?'paper':'live'];
+  document.getElementById('btnPaper').classList.toggle('on',v);
+  document.getElementById('btnReal').classList.toggle('on',!v);
+  const h2=document.getElementById('statusH2');
+  if(h2){h2.textContent=v?'Meridian Paper Agent':'Meridian Agent Active';h2.style.color=v?'#f0a':'';}
+  const dot=document.getElementById('statusDot');
+  if(dot)dot.style.background=v?'#f0a':'';
+  if(data)renderAll(data);
+  if(curPage==='candidates')loadPoolCandidates();
+  if(curPage==='activity')loadCandidates();
+  if(curPage==='learning')loadLearning();
+  if(curPage==='calendar')loadCalendar();
+}
 
 // ═══ NAV ═══
 $$('.nav-i').forEach(el=>{
@@ -646,12 +669,22 @@ $$('.nav-i').forEach(el=>{
   });
 });
 
-// ═══ LOAD OVERVIEW ═══
-async function load(){
-  data=await fj('/api/dashboard');if(!data)return;
-  const d=data;
-  $('#sbTime').textContent=wibTime();
-  $('#pillStrategy').textContent=(d.config?.strategy||'—').toUpperCase();
+// ═══ FETCH + RENDER ═══
+async function fetchBoth(){
+  const ts=Date.now();
+  const [live,papers]=await Promise.all([
+    fetch('/api/dashboard?_='+ts).then(r=>r.json()).catch(()=>null),
+    fetch('/api/dashboard?paper=true&_='+ts).then(r=>r.json()).catch(()=>null)
+  ]);
+  if(live)cache.live=live;
+  if(papers)cache.paper=papers;
+  data=cache[paperMode?'paper':'live'];
+  if(data)renderAll(data);
+}
+
+function renderAll(d){
+  if(!d)return;
+  const s=d.config?.strategy;const sn=typeof s==='string'?s:(s?.strategy||'—');$('#pillStrategy').textContent=sn.toUpperCase();
   renderStats(d);
   _lastPortfolioComponents=d.portfolio_components||null;
   renderChart(d.daily);
@@ -697,11 +730,11 @@ function renderStats(d){
     <div class="stat"><div class="stat-l">Unrealized</div><div class="stat-v ${unrColor}">${usd(unrealized)}</div><div class="stat-sub">${sol(unrealizedSol)}</div></div>
     <div class="stat"><div class="stat-l">Unclaimed</div><div class="stat-v cyan">$${f(unclaimed,2)}</div><div class="stat-sub">${f(unclaimedSol,6)} SOL</div></div>
     <div class="stat"><div class="stat-l">Net PnL</div><div class="stat-v ${pnlColor}">${usd(pnl)}</div><div class="stat-sub">${sol(pnlSol)}</div></div>
-    <div class="stat"><div class="stat-l">Avg Win</div><div class="stat-v grn">$${f(aw)}</div><div class="stat-sub">per win</div></div>
-    <div class="stat"><div class="stat-l">Avg Loss</div><div class="stat-v red">${usd(al)}</div><div class="stat-sub">per loss</div></div>
-    <div class="stat"><div class="stat-l">LP Gains</div><div class="stat-v ${realPnlColor}">${usd(realPnl)}</div><div class="stat-sub">${f(totalPnlSol,4)} SOL @ $${f(solPrice,0)}</div></div>
-    <div class="stat"><div class="stat-l">Portfolio<span class="stat-info" onclick="showPortfolioModal()" title="Portfolio breakdown">i</span></div><div class="stat-v ${portColor}">${portfolioUsd!=null?usd(portfolioUsd):'—'}</div><div class="stat-sub">${portfolioTotal!=null?'$'+f(portfolioTotal,0)+' now':''}${ds.total_usd?' / $'+f(ds.total_usd,0)+' in':''}</div></div>
+    <div class="stat"><div class="stat-l">PnL</div><div class="stat-v ${realPnlColor}">${usd(realPnl)}</div><div class="stat-sub">${f(totalPnlSol,4)} SOL @ $${f(solPrice,0)}</div></div>
   `;
+  if(!paperMode){
+    statsHtml+=`<div class="stat"><div class="stat-l">Portfolio<span class="stat-info" onclick="showPortfolioModal()" title="Portfolio breakdown">i</span></div><div class="stat-v ${portColor}">${portfolioUsd!=null?usd(portfolioUsd):'—'}</div><div class="stat-sub">${portfolioTotal!=null?'$'+f(portfolioTotal,0)+' now':''}${ds.total_usd?' / $'+f(ds.total_usd,0)+' in':''}</div></div>`;
+  }
   $('#statRow').innerHTML=statsHtml;
 }
 let _lastPortfolioComponents=null;
@@ -727,7 +760,18 @@ function showPortfolioModal(){
   $('#portfolioModal').classList.add('open');
 }
 function renderChart(daily){
-  if(!daily||!daily.length){$('#perfChart').parentElement.innerHTML='<div class="chart-empty">No data</div>';return;}
+  // Show/hide instead of removing canvas from DOM
+  const canvas=$('#perfChart');
+  const wrap=canvas?.parentElement;
+  let msg=wrap?.querySelector('.chart-empty');
+  if(!daily||!daily.length){
+    if(canvas)canvas.style.display='none';
+    if(wrap&&!msg){msg=document.createElement('div');msg.className='chart-empty';msg.textContent='No data';wrap.appendChild(msg);}
+    if(charts.perf)charts.perf.destroy();
+    return;
+  }
+  if(canvas)canvas.style.display='';
+  if(msg)msg.remove();
   const lb=daily.map(x=>x.date.slice(5));
   const cu=daily.map(x=>x.cumulative);
   const cuSol=daily.map(x=>x.cumulative_sol||0);
@@ -750,7 +794,18 @@ function renderChart(daily){
 }
 
 function renderDailyChart(daily){
-  if(!daily||!daily.length){$('#dailyChart').parentElement.innerHTML='<div class="chart-empty">No data</div>';return;}
+  // Show/hide instead of removing canvas from DOM
+  const canvas=$('#dailyChart');
+  const wrap=canvas?.parentElement;
+  let msg=wrap?.querySelector('.chart-empty');
+  if(!daily||!daily.length){
+    if(canvas)canvas.style.display='none';
+    if(wrap&&!msg){msg=document.createElement('div');msg.className='chart-empty';msg.textContent='No data';wrap.appendChild(msg);}
+    if(charts.daily)charts.daily.destroy();
+    return;
+  }
+  if(canvas)canvas.style.display='';
+  if(msg)msg.remove();
   const lb=daily.map(x=>x.date.slice(5));
   const valsUsd=daily.map(x=>x.pnl_usd);
   const valsSol=daily.map(x=>x.pnl_sol||0);
@@ -793,14 +848,15 @@ function renderFeeChart(daily){
 
 function renderConfig(c){
   if(!c)return;
-  $('#cfgStrategy').textContent=c.strategy||'—';
+  const st=(typeof c.strategy==='string'?c.strategy:(c.strategy?.strategy||'spot')).toLowerCase();
+  $('#cfgStrategy').textContent=st;
   const cfgItems=[['Max Positions',c.maxPositions],['Max Deploy',c.maxDeployAmount+' SOL'],['Position Size',(c.positionSizePct*100)+'%'],['Screening',c.screeningModel],['Management',c.managementModel],['Interval',c.screeningIntervalMin+'m']];
   $('#cfgGrid').innerHTML=cfgItems.map(([k,v])=>`<div class="cfg-item"><span class="cfg-k">${k}</span><span class="cfg-val">${v||'—'}</span></div>`).join('');
   const riskItems=[['Stop Loss',c.stopLossPct+'%'],['Take Profit','+'+c.takeProfitPct+'%'],['Trailing Trigger','+'+c.trailingTriggerPct+'%'],['Trailing Drop',c.trailingDropPct+'%'],['Emergency Drop',c.emergencyPriceDropPct+'%'],['Mgmt Interval',c.managementIntervalMin+'m'],['OOR Wait',c.outOfRangeWaitMinutes+'m'],['Bin Step',c.minBinStep+'-'+c.maxBinStep]];
   $('#riskGrid').innerHTML=riskItems.map(([k,v])=>`<div class="cfg-item"><span class="cfg-k">${k}</span><span class="cfg-val">${v||'—'}</span></div>`).join('');
 
   const g=(items)=>items.map(([k,v])=>`<div class="cfg-item"><span class="cfg-k">${k}</span><span class="cfg-val">${v}</span></div>`).join('');
-  const strat=[['Strategy',c.strategy],['Max Deploy',c.maxDeployAmount+' SOL'],['Max Positions',c.maxPositions],['Position Size',(c.positionSizePct*100)+'%'],['Min SOL to Open',c.minSolToOpen||c.minToOpen||'—'],['Gas Reserve',c.gasReserve!=null?c.gasReserve+' SOL':'—'],['Sol Mode',c.solMode?'Yes':'No'],['Strategy Detail',c.strategyDetail||(c.strategy==='spot'?'Single-side SOL':'Dual-side')]];
+  const strat=[['Strategy',st],['Max Deploy',c.maxDeployAmount+' SOL'],['Max Positions',c.maxPositions],['Position Size',(c.positionSizePct*100)+'%'],['Min SOL to Open',c.minSolToOpen||c.minToOpen||'—'],['Gas Reserve',c.gasReserve!=null?c.gasReserve+' SOL':'—'],['Sol Mode',c.solMode?'Yes':'No'],['Strategy Detail',c.strategyDetail||(st==='spot'?'Single-side SOL':'Dual-side')]];
   const risk=[['Stop Loss',c.stopLossPct+'%'],['Take Profit','+'+c.takeProfitPct+'%'],['Trailing Trigger','+'+c.trailingTriggerPct+'%'],['Trailing Drop',c.trailingDropPct+'%'],['Emergency Drop',c.emergencyPriceDropPct+'%'],['Min Fee/TVL 24h',c.minFeePerTvl24h+'%'],['Min Age Before Yield',c.minAgeBeforeYieldCheck+'m'],['OOR Wait',c.outOfRangeWaitMinutes+'m'],['OOR Bins to Close',c.outOfRangeBinsToClose],['OOR Cooldown',c.oorCooldownHours!=null?c.oorCooldownHours+'h':'—'],['OOR Cooldown Trigger',c.oorCooldownTriggerCount!=null?c.oorCooldownTriggerCount+'×':'—'],['Repeat Cooldown',c.repeatDeployCooldownEnabled?`${c.repeatDeployCooldownHours}h · ${c.repeatDeployCooldownTriggerCount}× · ${c.repeatDeployCooldownScope}`:'Off'],['Min Claim',c.minClaimAmount!=null?c.minClaimAmount:'—'],['Trailing TP',c.trailingTakeProfit?'On':'Off']];
   const screen=[['Min TVL','$'+c.minTvl],['Max TVL','$'+c.maxTvl],['Min Volume','$'+c.minVolume],['Min Organic',c.minOrganic],['Min Quote Organic',c.minQuoteOrganic],['Min Holders',c.minHolders],['Min MCap','$'+c.minMcap],['Max MCap','$'+c.maxMcap],['Bin Step',c.minBinStep+'-'+c.maxBinStep],['Max Bot Holders',c.maxBotHoldersPct+'%'],['Max Top 10%',c.maxTop10Pct+'%'],['Max Volatility',c.maxVolatility!=null?c.maxVolatility:'—'],['Min Token Fees',c.minTokenFeesSol+' SOL'],['Min Fee/Active TVL',c.minFeeActiveTvlRatio!=null?c.minFeeActiveTvlRatio:'—'],['Min Token Age',c.minTokenAgeHours!=null?c.minTokenAgeHours+'h':'—'],['Max Token Age',c.maxTokenAgeHours!=null?c.maxTokenAgeHours+'h':'—'],['Min Vol to Rebalance',c.minVolumeToRebalance!=null?'$'+c.minVolumeToRebalance:'—'],['Screening Source',c.screeningSource||'—'],['Timeframe',c.timeframe],['Category',c.category]];
   const sched=[['Screening Interval',c.screeningIntervalMin+'m'],['Management Interval',c.managementIntervalMin+'m'],['Health Check Interval',c.healthCheckIntervalMin+'m'],['Screening Model',c.screeningModel],['Management Model',c.managementModel],['General Model',c.generalModel],['Temperature',c.temperature],['Max Tokens',c.maxTokens],['Max Steps',c.maxSteps]];
@@ -818,7 +874,7 @@ function renderPositions(positions){
   $('#posCountPage').textContent=count+' active positions';
   if(!count){el.innerHTML='<div class="pos-empty">No active positions — waiting for screening cycle</div>';return;}
   el.innerHTML=positions.map(p=>{
-    const dep=p.deployed_at?wibDateShort(p.deployed_at):'—';
+    const dep=p.deployed_at?utcDateShort(p.deployed_at):'—';
     const hold=p.deployed_at?tm((Date.now()-new Date(p.deployed_at).getTime())/60000):'—';
     const rangeW=(p.bins_below||0)*(p.bin_step||100)/100;
     const oor=!!p.out_of_range_since;
@@ -873,7 +929,7 @@ function renderRecentTrades(history){
     const pnl=t.pnl_usd||0,pct=t.pnl_pct||0;
     const pnlSol=t.pnl_sol||0;
     const feesSol=t.fees_sol||0;
-    const dt=t.recorded_at?wibDateShort(t.recorded_at):'—';
+    const dt=t.recorded_at?utcDateShort(t.recorded_at):'—';
     const r=(t.close_reason||'—');const sr=r.length>20?r.slice(0,20)+'…':r;
     return `<div class="trade-item"><div class="trade-info"><div class="trade-pair">${t.pool_name||'—'}</div><div class="trade-meta">${tm(t.minutes_held)} • ${sr} • ${dt}</div></div><div><div class="trade-pnl ${pnl>=0?'grn':'red'}">${usd(pnl)} <span style="font-size:10px;opacity:.7">${pnlSol>=0?'+':''}${pnlSol.toFixed(4)} SOL</span></div><div class="trade-pnl-sub">${pct>=0?'+':''}${f(pct)}% • fees ${f(feesSol,6)} SOL</div></div></div>`;
   }).join('');
@@ -912,24 +968,24 @@ function renderLearnRestrict(d){
 
 function renderStatus(d){
   const stale=d.stale_min;
-  // Stale if state hasn't updated in >20min (mgmt cycle is typically a few min)
   const isStale=stale!=null&&stale>20;
   const dot=$('#statusDot'),pill=$('#statusPill'),live=$('.sb-ft .live'),h2=$('#statusH2');
   if(isStale){
     if(pill){pill.textContent='Stale';pill.classList.remove('on');pill.classList.add('warn');}
     if(dot)dot.style.background='var(--orange)';
     if(live){live.textContent='● STALE';live.style.color='var(--orange)';}
-    if(h2)h2.textContent='Meridian — Last seen '+(stale<60?Math.round(stale)+'m':(stale/60).toFixed(1)+'h')+' ago';
+    if(h2&&!paperMode)h2.textContent='Meridian — Last seen '+(stale<60?Math.round(stale)+'m':(stale/60).toFixed(1)+'h')+' ago';
+    if(h2&&paperMode)h2.textContent='Meridian Paper — Last seen '+(stale<60?Math.round(stale)+'m':(stale/60).toFixed(1)+'h')+' ago';
   }else{
     if(pill){pill.textContent='Online';pill.classList.add('on');pill.classList.remove('warn');}
-    if(dot)dot.style.background='';
-    if(live){live.textContent='● LIVE';live.style.color='';}
-    if(h2)h2.textContent='Meridian Agent Active';
+    if(dot)dot.style.background=paperMode?'#f0a':'';
+    if(live){live.textContent=paperMode?'● PAPER':'● LIVE';live.style.color=paperMode?'#f0a':'';}
+    if(h2){h2.textContent=paperMode?'Meridian Paper Agent':'Meridian Agent Active';h2.style.color=paperMode?'#f0a':'';}
   }
 }
 
 // ═══ CALENDAR ═══
-let calDaily={},calByDay={},calYear=wibNow().getFullYear(),calMonth=wibNow().getMonth(),calSelDate=wibToday();
+let calDaily={},calByDay={},calYear=utcNow().getFullYear(),calMonth=utcNow().getMonth(),calSelDate=utcToday();
 async function loadCalendar(){
   const d=await fj('/api/calendar');if(!d)return;
   calDaily={};calByDay=d.by_day||{};
@@ -946,7 +1002,7 @@ function renderCalendar(){
   const startDay=first.getDay();
   const totalDays=last.getDate();
   const today=new Date();
-  const todayStr=wibToday();
+  const todayStr=utcToday();
   // Monthly stats
   let monthPnl=0,monthTrades=0,monthWins=0,monthDays=0;
   let monthPnlSol=0;
@@ -1005,7 +1061,7 @@ function renderCalendar(){
 function renderCalPositions(){
   const el=$('#calPositions');
   const positions=calByDay[calSelDate]||[];
-  const dateLabel=new Date(calSelDate+'T12:00:00').toLocaleDateString('en-US',{timeZone:WIB_TZ,weekday:'short',month:'short',day:'numeric',year:'numeric'});
+  const dateLabel=new Date(calSelDate+'T12:00:00').toLocaleDateString('en-US',{timeZone:'UTC',weekday:'short',month:'short',day:'numeric',year:'numeric'});
   if(!positions.length){
     el.innerHTML=`<div class="cal-positions"><h3>${dateLabel}</h3><div class="cal-pos-empty">No positions on this day</div></div>`;
     return;
@@ -1132,7 +1188,7 @@ function renderCandTbl(){
   const page=allCfiltered.slice(s,e);
   let h='<table><thead><tr><th>Pool</th><th>Type</th><th>Details</th><th>Risks</th><th>Date</th></tr></thead><tbody>';
   for(const dec of page){
-    const ts=dec.ts?wibDateShort(dec.ts):'—';
+    const ts=dec.ts?utcDateShort(dec.ts):'—';
     const tp=dec.type||'skip';
     const tpCls=tp==='deploy'?'grn':tp==='close'?'cyn':tp==='no_deploy'?'red':'z';
     const pool=dec.pool_display||'—';
@@ -1202,7 +1258,7 @@ async function loadLearning(){
   if(lessons.length){
     $('#lessonsList').innerHTML=lessons.slice(0,15).map(l=>{
       const outcome=l.outcome||'neutral';
-      const ts=l.created_at?wibDateShort(l.created_at):'';
+      const ts=l.created_at?utcDateShort(l.created_at):'';
       return `<div class="learn-item"><div class="learn-rule">${l.rule||'—'}</div><div class="learn-meta"><span class="learn-outcome ${outcome}">${outcome}</span>${l.pnl_pct!=null?`PnL: ${l.pnl_pct}%`:''}${l.confidence?`Conf: ${(l.confidence*100).toFixed(0)}%`:''}${ts?`<span style="margin-left:auto;color:var(--t4)">${ts}</span>`:''}</div></div>`;
     }).join('');
   }else{$('#lessonsList').innerHTML='<div style="color:var(--t4);font-size:11px;font-family:var(--mono)">No lessons recorded yet</div>';}
@@ -1254,7 +1310,7 @@ function renderTbl(){
   const page=allH.slice(s,e);
   let h='<table><thead><tr><th>Pool</th><th>Size</th><th>PnL</th><th>SOL</th><th>SOL Gains (USD)</th><th>Hold</th><th>Date</th></tr></thead><tbody>';
   for(const t of page){
-    const dt=t.recorded_at?wibDateShort(t.recorded_at):'—';
+    const dt=t.recorded_at?utcDateShort(t.recorded_at):'—';
     const p=t.pnl_usd||0,pct=t.pnl_pct||0;
     const pnlSol=t.pnl_sol||0;
     const realPnl=t.real_pnl_usd;
@@ -1274,8 +1330,8 @@ function renderPg(){
 }
 function goPg(n){pgCur=Math.max(1,Math.min(n,Math.ceil(allH.length/pgSz)));renderTbl();}
 
-load();
-setInterval(load,60000);
+fetchBoth();
+setInterval(fetchBoth,60000);
 
 // ═══ MOBILE NAV ═══
 const mobPages=[

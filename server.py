@@ -5,7 +5,7 @@ Read-only visualization of /root/meridian/ state files
 import json, os, urllib.request, urllib.error, time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from fastapi.responses import HTMLResponse
 
 app = FastAPI(title="Meridian Dashboard")
@@ -48,8 +48,14 @@ def load_dashboard_config():
         return json.loads(DASHBOARD_CONFIG.read_text())
     return {"wallet_rpc_enabled": False}
 
-def load(fn):
-    fp = MERIDIAN / fn
+PAPER = Path("/root/meridian/paper")
+
+def get_meridian(paper=False):
+    """Return the active meridian path (real or paper)."""
+    return PAPER if paper else MERIDIAN
+
+def load(fn, paper=False):
+    fp = get_meridian(paper) / fn
     if not fp.exists(): return {}
     try:
         with open(fp) as f: return json.load(f)
@@ -110,6 +116,13 @@ def latest_wallet_balance():
             except: continue
             if rec.get("tool") != "get_wallet_balance" or not rec.get("success"): continue
             res = rec.get("result", {}) or {}
+            if isinstance(res, str):
+                try:
+                    res = json.loads(res)
+                except:
+                    res = {}
+            if not isinstance(res, dict):
+                res = {}
             res["as_of"] = rec.get("timestamp")
             return res
     return None
@@ -533,11 +546,11 @@ def fmt(n, d=2):
     return round(float(n), d)
 
 @app.get("/api/dashboard")
-async def dashboard():
-    state = load("state.json")
-    lessons = load("lessons.json")
-    config = load("user-config.json")
-    pool_mem = load("pool-memory.json")
+async def dashboard(paper: bool = Query(False)):
+    state = load("state.json", paper=paper)
+    lessons = load("lessons.json", paper=paper)  # Agent-specific — overview shows agent's own PnL
+    config = load("user-config.json", paper=paper)
+    pool_mem = load("pool-memory.json", paper=paper)
 
     perf = lessons.get("performance", []) if isinstance(lessons, dict) else []
     closed = [p for p in perf if isinstance(p, dict)]
@@ -547,8 +560,8 @@ async def dashboard():
     if not wallet:
         wallet = state.get("owner", "") or state.get("wallet", "")
 
-    # Deposit tracking — fetch from Helius if cached data is stale
-    deposit_stats = fetch_deposits()
+    # Deposit tracking — fetch from Helius if cached data is stale (live only; paper uses simulated)
+    deposit_stats = fetch_deposits() if not paper else None
     
     # Update wallet if still empty (found from deposit tracking logs)
     if not wallet:
@@ -661,14 +674,13 @@ async def dashboard():
     sl_count = sum(1 for p in closed if "stop loss" in (p.get("close_reason") or "").lower())
     oor_count = sum(1 for p in closed if "rule 3" in (p.get("close_reason") or "").lower() or "rule 4" in (p.get("close_reason") or "").lower() or "pumped" in (p.get("close_reason") or "").lower())
 
-    # Daily PnL for chart (WIB timezone)
-    WIB_OFFSET = timedelta(hours=7)
+    # Daily PnL for chart (UTC timezone — matching calendar)
     daily = {}
     for p in closed:
         ts = p.get("recorded_at", "")
         if not ts: continue
         try:
-            dt = datetime.fromisoformat(ts.replace("Z", "+00:00")) + WIB_OFFSET
+            dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
             day = dt.strftime("%Y-%m-%d")
         except:
             day = ts[:10]
@@ -712,14 +724,18 @@ async def dashboard():
             # Real PnL for this trade at today's price
             h["real_pnl_usd"] = round(_amt * _pct / 100 * sol_price_for_pnl, 4) if sol_price_for_pnl else None
 
-    # Config — pass full config + computed fields
+    # Config — normalize strategy if it's a nested object (paper config has {strategy, minBinsBelow, maxBinsBelow})
+    raw_strategy = config.get("strategy")
+    if isinstance(raw_strategy, dict):
+        config["strategy"] = raw_strategy.get("strategy", "spot")
     config_summary = dict(config)
     config_summary["solMode"] = config.get("solMode", False)
-    config_summary["strategyDetail"] = "Single-side SOL" if config.get("strategy") == "spot" else "Dual-side"
+    strategy_name = config.get("strategy", "spot")
+    config_summary["strategyDetail"] = "Single-side SOL" if strategy_name == "spot" else "Dual-side"
 
     # Boot time for accurate uptime
     boot_time = None
-    boot_file = MERIDIAN / "boot_time"
+    boot_file = get_meridian(paper) / "boot_time"
     if boot_file.exists():
         try:
             boot_time = boot_file.read_text().strip()
@@ -741,26 +757,45 @@ async def dashboard():
         key=lambda x: x.get("ts", ""), reverse=True
     )[:15]
 
-    # Wallet balance — prefer RPC (live), fallback to logs
-    dc = load_dashboard_config()
-    rpc_enabled = dc.get("wallet_rpc_enabled", False) and bool(HELIUS_API_KEY)
-    wb = fetch_wallet_rpc() if rpc_enabled else None
-    wallet_balance = None
-    if wb:
+    # Wallet balance — paper uses simulated, live uses RPC
+    if paper:
+        # Paper agent: simulated 100 SOL starting balance
+        sol_price = get_sol_price()
+        total_deployed = sum(p.get("amount_sol", 0) or 0 for p in active)
+        paper_sol = max(0, 100.0 - total_deployed)
         wallet_balance = {
-            "sol": fmt(wb.get("sol"), 4),
-            "sol_usd": fmt(wb.get("sol_usd")),
-            "sol_price": fmt(wb.get("sol_price")),
-            "usdc": fmt(wb.get("usdc")),
-            "total_usd": fmt(wb.get("total_usd")),
-            "tokens": [
-                {"symbol": t.get("symbol", "?"), "balance": fmt(t.get("balance"), 4), "usd": fmt(t.get("usd"))}
-                for t in (wb.get("tokens") or []) if isinstance(t, dict)
-            ],
-            "as_of": wb.get("as_of"),
+            "sol": round(paper_sol, 4),
+            "sol_usd": round(paper_sol * sol_price, 2),
+            "sol_price": round(sol_price, 2),
+            "usdc": 0,
+            "total_usd": round(paper_sol * sol_price, 2),
+            "tokens": [],
+            "as_of": datetime.now(timezone.utc).isoformat(),
         }
-        if not wallet:
-            wallet = wb.get("wallet", "") or wallet
+        wallet = state.get("wallet", "") or "DR2UaR2nhR1Wc7QezUyvDH655nTDCquvMijs2pDaY8Sy"
+        rpc_enabled = False
+        # Paper: no deposit tracking — portfolio card hidden in UI
+        deposit_stats = {}
+    else:
+        dc = load_dashboard_config()
+        rpc_enabled = dc.get("wallet_rpc_enabled", False) and bool(HELIUS_API_KEY)
+        wb = fetch_wallet_rpc() if rpc_enabled else None
+        wallet_balance = None
+        if wb:
+            wallet_balance = {
+                "sol": fmt(wb.get("sol"), 4),
+                "sol_usd": fmt(wb.get("sol_usd")),
+                "sol_price": fmt(wb.get("sol_price")),
+                "usdc": fmt(wb.get("usdc")),
+                "total_usd": fmt(wb.get("total_usd")),
+                "tokens": [
+                    {"symbol": t.get("symbol", "?"), "balance": fmt(t.get("balance"), 4), "usd": fmt(t.get("usd"))}
+                    for t in (wb.get("tokens") or []) if isinstance(t, dict)
+                ],
+                "as_of": wb.get("as_of"),
+            }
+            if not wallet:
+                wallet = wb.get("wallet", "") or wallet
 
     # Net worth = tokens holding (wallet) + open positions + rent fees.
     # Position value: prefer last_total_value_usd (on-chain from SDK), fallback to amount_sol × sol_price
@@ -955,11 +990,11 @@ async def update_config(body: dict):
     return {"ok": True, **config}
 
 @app.get("/api/candidates")
-async def candidates():
+async def candidates(paper: bool = Query(False)):
     import re
-    decision_log = load("decision-log.json")
+    decision_log = load("decision-log.json", paper=paper)
     decisions = decision_log.get("decisions", []) if isinstance(decision_log, dict) else []
-    pool_mem = load("pool-memory.json")
+    pool_mem = load("pool-memory.json", paper=paper)
 
     # Sort by timestamp descending — return ALL, frontend handles pagination
     recent = sorted(decisions, key=lambda x: x.get("ts", ""), reverse=True)
@@ -1054,10 +1089,10 @@ async def candidates():
     }
 
 @app.get("/api/pool-candidates")
-async def pool_candidates():
+async def pool_candidates(paper: bool = Query(False)):
     """Return pool candidates from pool-memory.json for the Candidates tab."""
-    pool_mem = load("pool-memory.json")
-    state_data = load("state.json")
+    pool_mem = load("pool-memory.json", paper=paper)
+    state_data = load("state.json", paper=paper)
     
     # Get open positions
     open_positions = state_data.get("positions", {})
@@ -1112,9 +1147,9 @@ async def pool_candidates():
     }
 
 @app.get("/api/candidates-latest")
-async def candidates_latest():
+async def candidates_latest(paper: bool = Query(False)):
     """Return latest cached candidates from Meridian screening (candidates-cache.json)."""
-    cache_path = MERIDIAN / "candidates-cache.json"
+    cache_path = get_meridian(paper) / "candidates-cache.json"
     if not cache_path.exists():
         return {"candidates": [], "updatedAt": None, "total": 0}
     try:
@@ -1128,10 +1163,10 @@ async def candidates_latest():
         return {"candidates": [], "updatedAt": None, "total": 0}
 
 @app.get("/api/learning")
-async def learning():
-    lessons_data = load("lessons.json")
-    signal_weights = load("signal-weights.json")
-    pool_mem = load("pool-memory.json")
+async def learning(paper: bool = Query(False)):
+    lessons_data = load("lessons.json", paper=False)  # Shared
+    signal_weights = load("signal-weights.json", paper=paper)
+    pool_mem = load("pool-memory.json", paper=paper)
 
     lessons = lessons_data.get("lessons", []) if isinstance(lessons_data, dict) else []
     perf = lessons_data.get("performance", []) if isinstance(lessons_data, dict) else []
@@ -1181,7 +1216,9 @@ async def learning():
 
 @app.get("/", response_class=HTMLResponse)
 async def index():
-    return HTMLResponse((Path(__file__).parent / "index.html").read_text())
+    from fastapi.responses import Response
+    content = (Path(__file__).parent / "index.html").read_text()
+    return Response(content=content, media_type="text/html", headers={"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache", "Expires": "0"})
 
 @app.get("/favicon.svg")
 async def favicon():
@@ -1189,19 +1226,18 @@ async def favicon():
     return FileResponse(Path(__file__).parent / "favicon.svg", media_type="image/svg+xml")
 
 @app.get("/api/calendar")
-async def calendar():
-    state = load("state.json")
-    lessons = load("lessons.json")
-    config = load("user-config.json")
+async def calendar(paper: bool = Query(False)):
+    state = load("state.json", paper=paper)
+    lessons = load("lessons.json", paper=paper)
+    config = load("user-config.json", paper=paper)
 
     perf = lessons.get("performance", []) if isinstance(lessons, dict) else []
     closed = [p for p in perf if isinstance(p, dict)]
 
-    # Build daily data (WIB timezone)
-    WIB_OFFSET = timedelta(hours=7)
-    def _wib_day(ts_str):
+    # Build daily data (UTC — matches Meteora/Meridian timezone)
+    def _utc_day(ts_str):
         try:
-            dt = datetime.fromisoformat(ts_str.replace("Z", "+00:00")) + WIB_OFFSET
+            dt = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
             return dt.strftime("%Y-%m-%d")
         except:
             return ts_str[:10]
@@ -1210,7 +1246,7 @@ async def calendar():
     for p in closed:
         ts = p.get("recorded_at", "")
         if not ts: continue
-        day = _wib_day(ts)
+        day = _utc_day(ts)
         if day not in daily:
             daily[day] = {"date": day, "pnl_usd": 0, "pnl_sol": 0, "trades": 0, "wins": 0, "fees": 0, "fees_sol": 0, "positions": 0}
         daily[day]["pnl_usd"] += p.get("pnl_usd", 0) or 0
@@ -1227,7 +1263,7 @@ async def calendar():
     for p in closed:
         ts = p.get("recorded_at", "")
         if not ts: continue
-        day = _wib_day(ts)
+        day = _utc_day(ts)
         if day in daily:
             daily[day]["positions"] = daily[day].get("positions", 0) + 1
 
@@ -1236,7 +1272,7 @@ async def calendar():
     for p in closed:
         ts = p.get("recorded_at", "")
         if not ts: continue
-        day = _wib_day(ts)
+        day = _utc_day(ts)
         if day not in by_day: by_day[day] = []
         pnl = p.get("pnl_pct", 0) or 0
         by_day[day].append({
