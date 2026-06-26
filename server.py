@@ -2,14 +2,89 @@
 Meridian Dashboard API — Charon-inspired dark terminal UI
 Read-only visualization of /root/meridian/ state files
 """
-import json, os, urllib.request, urllib.error, time
+import json, os, urllib.request, urllib.error, time, secrets
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from fastapi import FastAPI, Query
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Query, Request, Form, Depends, HTTPException
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from starlette.middleware.sessions import SessionMiddleware
 
 app = FastAPI(title="Meridian Dashboard")
 MERIDIAN = Path(os.environ.get("MERIDIAN_PATH", "/root/meridian"))
+
+DASHBOARD_CONFIG = Path(__file__).parent / "dashboard-config.json"
+
+def load_dashboard_config():
+    if DASHBOARD_CONFIG.exists():
+        return json.loads(DASHBOARD_CONFIG.read_text())
+    return {}
+
+def save_dashboard_config(cfg):
+    DASHBOARD_CONFIG.write_text(json.dumps(cfg, indent=2))
+
+# Session secret — persist across restarts
+cfg = load_dashboard_config()
+if "session_secret" not in cfg:
+    cfg["session_secret"] = secrets.token_hex(32)
+    save_dashboard_config(cfg)
+
+# Auth middleware — must come before SessionMiddleware in code
+# (Starlette applies in reverse order, so session runs first)
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    path = request.url.path
+    # Login page + favicon are public
+    if path in ("/login", "/favicon.svg"):
+        return await call_next(request)
+    # API: return 401 JSON if not authenticated
+    if path.startswith("/api/") and not request.session.get("authenticated", False):
+        return Response(content=json.dumps({"error": "Unauthorized"}), status_code=401, media_type="application/json")
+    # All other routes: redirect to login if not authenticated
+    if not request.session.get("authenticated", False):
+        return RedirectResponse(url="/login", status_code=302)
+    return await call_next(request)
+
+app.add_middleware(SessionMiddleware, secret_key=cfg["session_secret"])
+
+# Auth dependency for route-level checks
+def require_auth(request: Request):
+    if not request.session.get("authenticated"):
+        raise HTTPException(status_code=401)
+    return True
+
+LOGIN_HTML = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Meridian • Login</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'JetBrains Mono',monospace;background:#0d0d0d;color:#e5e5e5;display:flex;align-items:center;justify-content:center;min-height:100vh;-webkit-font-smoothing:antialiased}
+.card{background:#141414;border:1px solid #252525;border-radius:8px;padding:32px;width:360px;max-width:90vw}
+.card h1{font-size:16px;font-weight:700;color:#00e676;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px}
+.card p{font-size:11px;color:#666;margin-bottom:24px}
+.card input{width:100%;padding:10px 12px;background:#1a1a1a;border:1px solid #333;border-radius:4px;color:#e5e5e5;font-family:inherit;font-size:13px;margin-bottom:12px;outline:none;transition:border .15s}
+.card input:focus{border-color:#00e676}
+.card button{width:100%;padding:10px;background:#00e676;color:#0d0d0d;border:none;border-radius:4px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:1px;text-transform:uppercase;transition:opacity .15s}
+.card button:hover{opacity:.85}
+.err{color:#ff5252;font-size:11px;margin-bottom:12px;display:none}
+.ft{text-align:center;margin-top:16px;font-size:9px;color:#444}
+</style>
+</head>
+<body>
+<div class="card">
+<h1>Meridian</h1>
+<p>DLMM Agent Dashboard</p>
+<form method="post" action="/login">
+<input type="password" name="password" placeholder="Enter password" autofocus>
+<button type="submit">Login</button>
+<div class="err" id="err">{error}</div>
+</form>
+<div class="ft">Session • Secure</div>
+</div>
+</body>
+</html>"""
 WALLET = os.environ.get("MERIDIAN_WALLET", "")
 
 # Load Helius API key from Meridian .env
@@ -40,13 +115,6 @@ if not ALCHEMY_API_KEY:
                         break
         except:
             pass
-
-DASHBOARD_CONFIG = Path(__file__).parent / "dashboard-config.json"
-
-def load_dashboard_config():
-    if DASHBOARD_CONFIG.exists():
-        return json.loads(DASHBOARD_CONFIG.read_text())
-    return {"wallet_rpc_enabled": False}
 
 PAPER = Path("/root/meridian/paper")
 
@@ -986,7 +1054,7 @@ async def update_config(body: dict):
     config = load_dashboard_config()
     if "wallet_rpc_enabled" in body:
         config["wallet_rpc_enabled"] = bool(body["wallet_rpc_enabled"])
-    DASHBOARD_CONFIG.write_text(json.dumps(config, indent=2))
+    save_dashboard_config(config)
     return {"ok": True, **config}
 
 @app.get("/api/candidates")
@@ -1213,6 +1281,27 @@ async def learning(paper: bool = Query(False)):
             "avg_range_efficiency": fmt(avg_range_eff),
         }
     }
+
+# Default password — stored in dashboard-config.json
+DASHBOARD_PASSWORD = cfg.get("password", "meridian")  # CHANGE THIS after first login
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request):
+    error = request.query_params.get("error", "")
+    err_html = f'<div class="err" style="display:block">{error}</div>' if error else ""
+    return HTMLResponse(LOGIN_HTML.replace("{error}", err_html))
+
+@app.post("/login")
+async def login_post(request: Request, password: str = Form(...)):
+    if password == DASHBOARD_PASSWORD:
+        request.session["authenticated"] = True
+        return RedirectResponse(url="/", status_code=302)
+    return RedirectResponse(url="/login?error=Wrong+password", status_code=302)
+
+@app.get("/logout")
+async def logout(request: Request):
+    request.session.clear()
+    return RedirectResponse(url="/login", status_code=302)
 
 @app.get("/", response_class=HTMLResponse)
 async def index():
