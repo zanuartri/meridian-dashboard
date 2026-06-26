@@ -484,7 +484,7 @@ def fetch_deposits():
             return cache.get("stats", {})
 
         # Step 2: Get transaction details (batch of 5 to stay under rate limit)
-        existing_sigs = {d["sig"] for d in cache["deposits"]}
+        existing_sigs = {d.get("sig", "") for d in cache["deposits"]}
         new_deposits = []
 
         # Known programs to exclude (LP operations, swaps, DeFi interactions)
@@ -595,6 +595,10 @@ def fetch_deposits():
         avg_price = weighted_usd / total_sol if total_sol > 0 else 0
         with_price = sum(1 for d in deposits if d.get("sol_price", 0) > 0)
 
+        withdrawals = cache.get("withdrawals", [])
+        withdrawn_sol = sum(w.get("amount_sol", 0) for w in withdrawals)
+        withdrawn_usd = sum(w.get("amount_usd", 0) for w in withdrawals)
+
         cache["stats"] = {
             "total_sol": round(total_sol, 4),
             "total_usd": round(weighted_usd, 2),
@@ -602,6 +606,8 @@ def fetch_deposits():
             "count": len(deposits),
             "with_price": with_price,
             "last_deposit_ts": deposits[-1]["ts"] if deposits else 0,
+            "withdrawn_sol": round(withdrawn_sol, 4),
+            "withdrawn_usd": round(withdrawn_usd, 2),
         }
 
         save_deposits_cache(cache)
@@ -954,8 +960,9 @@ async def dashboard(paper: bool = Query(False)):
         
         if current_sol > 0:
             deposited_usd = deposit_stats.get("total_usd", 0)
+            withdrawn_usd = deposit_stats.get("withdrawn_usd", 0) or 0
             current_usd = round(current_sol * sol_price_for_pnl, 2) if sol_price_for_pnl else 0
-            portfolio_pnl_usd = round(current_usd - deposited_usd, 2)
+            portfolio_pnl_usd = round(current_usd + withdrawn_usd - deposited_usd, 2)
             portfolio_pnl_sol = round(portfolio_pnl_usd / sol_price_for_pnl, 6) if sol_price_for_pnl else None
             portfolio_total_usd = current_usd
             portfolio_components = {
@@ -967,6 +974,8 @@ async def dashboard(paper: bool = Query(False)):
                 "current_usd": current_usd,
                 "deposited_sol": deposit_stats.get("total_sol", 0),
                 "deposited_usd": deposited_usd,
+                "withdrawn_sol": deposit_stats.get("withdrawn_sol", 0),
+                "withdrawn_usd": withdrawn_usd,
                 "avg_deposit_price": deposit_stats.get("avg_price", 0),
                 "sol_price": sol_price_for_pnl,
             }

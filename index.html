@@ -736,7 +736,8 @@ function renderStats(d){
     <div class="stat"><div class="stat-l">PnL</div><div class="stat-v ${realPnlColor}">${usd(realPnl)}</div><div class="stat-sub">${f(totalPnlSol,4)} SOL @ $${f(solPrice,0)}</div></div>
   `;
   if(!paperMode){
-    statsHtml+=`<div class="stat"><div class="stat-l">Portfolio<span class="stat-info" onclick="showPortfolioModal()" title="Portfolio breakdown">i</span></div><div class="stat-v ${portColor}">${portfolioUsd!=null?usd(portfolioUsd):'—'}</div><div class="stat-sub">${portfolioTotal!=null?'$'+f(portfolioTotal,0)+' now':''}${ds.total_usd?' / $'+f(ds.total_usd,0)+' in':''}</div></div>`;
+    const netIn=ds.total_usd - (ds.withdrawn_usd||0);
+    statsHtml+=`<div class="stat"><div class="stat-l">Portfolio<span class="stat-info" onclick="showPortfolioModal()" title="Portfolio breakdown">i</span></div><div class="stat-v ${portColor}">${portfolioUsd!=null?usd(portfolioUsd):'—'}</div><div class="stat-sub">${portfolioTotal!=null?'$'+f(portfolioTotal,0)+' now':''}${ds.total_usd?' / $'+f(netIn,0)+' in':''}</div></div>`;
   }
   $('#statRow').innerHTML=statsHtml;
 }
@@ -755,9 +756,12 @@ function showPortfolioModal(){
   h+=`<div class="modal-row"><span class="mk">Current Total</span><span class="mv">${c.current_sol.toFixed(4)} SOL <span style="color:var(--t4);font-size:10px">($${f(c.current_usd)})</span></span></div>`;
   h+=`<div class="modal-sep"></div>`;
   h+=`<div class="modal-row"><span class="mk">Deposited</span><span class="mv">${c.deposited_sol.toFixed(4)} SOL <span style="color:var(--t4);font-size:10px">($${f(c.deposited_usd)} @ $${f(c.avg_deposit_price)}/SOL)</span></span></div>`;
+  if(c.withdrawn_sol>0){
+    h+=`<div class="modal-row"><span class="mk">Withdrawn</span><span class="mv">${c.withdrawn_sol.toFixed(4)} SOL <span style="color:var(--t4);font-size:10px">($${f(c.withdrawn_usd)})</span></span></div>`;
+  }
   h+=`<div class="modal-row"><span class="mk">SOL Price</span><span class="mv">$${f(c.sol_price)}</span></div>`;
   h+=`<div class="modal-sep"></div>`;
-  const pnl=c.current_usd-c.deposited_usd;
+  const pnl=c.current_usd + (c.withdrawn_usd||0) - c.deposited_usd;
   h+=`<div class="modal-row ${pnl>=0?'mv-grn':'mv-red'}"><span class="mk">Portfolio PnL</span><span class="mv">${pnl>=0?'+':''}$${f(pnl)}</span></div>`;
   $('#portfolioModalBody').innerHTML=h;
   $('#portfolioModal').classList.add('open');
