@@ -1164,7 +1164,7 @@ async def candidates_latest(paper: bool = Query(False)):
 
 @app.get("/api/learning")
 async def learning(paper: bool = Query(False)):
-    lessons_data = load("lessons.json", paper=False)  # Shared
+    lessons_data = load("lessons.json", paper=paper)
     signal_weights = load("signal-weights.json", paper=paper)
     pool_mem = load("pool-memory.json", paper=paper)
 
