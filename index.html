@@ -733,7 +733,7 @@ function renderStats(d){
 
   const netDeposited = (d.deposit_stats?.total_usd||0) - (d.deposit_stats?.withdrawn_usd||0);
   const portfolioCard = portfolioUsd!=null
-    ? `<div class="stat"><div class="stat-l">Portfolio<span class="stat-info" onclick="showPortfolioModal()" title="Portfolio breakdown">i</span></div><div class="stat-v ${portColor}">${portfolioUsd>=0?'+':''}$${f(Math.abs(portfolioUsd))}</div><div class="stat-sub">$${f(portfolioTotal)} now / $${f(netDeposited)} net</div></div>`
+    ? `<div class="stat"><div class="stat-l">Portfolio<span class="stat-info" onclick="showPortfolioModal()" title="Portfolio breakdown">i</span></div><div class="stat-v ${portColor}">${portfolioUsd>=0?'+':'-'}$${f(Math.abs(portfolioUsd))}</div><div class="stat-sub">$${f(portfolioTotal)} now / $${f(netDeposited)} net</div></div>`
     : '';
   let statsHtml=`
     <div class="stat"><div class="stat-l">Open</div><div class="stat-v blue">${d.position_count}/${d.max_positions}</div><div class="stat-sub">positions</div></div>
