@@ -582,6 +582,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
         <div class="term-title"><div class="term-dot"></div><h2>Settings</h2></div>
       </div>
       <div class="settings-grid">
+        <div class="cfg-box"><h3><span style="color:var(--blue)">🟦</span> Dual Mode (Stable + Satellite)</h3><div class="cfg-grid" id="fullCfgDual"></div></div>
         <div class="cfg-box"><h3><span style="color:var(--grn)">⚡</span> Strategy</h3><div class="cfg-grid" id="fullCfgStrategy"></div></div>
         <div class="cfg-box"><h3><span style="color:var(--red)">🛡</span> Risk & Management</h3><div class="cfg-grid" id="fullCfgRisk"></div></div>
         <div class="cfg-box"><h3><span style="color:var(--orange)">⏱</span> Schedule & Models</h3><div class="cfg-grid" id="fullCfgSchedule"></div></div>
@@ -859,15 +860,29 @@ function renderConfig(c){
   $('#cfgStrategy').textContent=st;
   const cfgItems=[['Max Positions',c.maxPositions],['Max Deploy',c.maxDeployAmount+' SOL'],['Position Size',(c.positionSizePct*100)+'%'],['Screening',c.screeningModel],['Management',c.managementModel],['Interval',c.screeningIntervalMin+'m']];
   $('#cfgGrid').innerHTML=cfgItems.map(([k,v])=>`<div class="cfg-item"><span class="cfg-k">${k}</span><span class="cfg-val">${v||'—'}</span></div>`).join('');
-  const riskItems=[['Stop Loss',c.stopLossPct+'%'],['Take Profit','+'+c.takeProfitPct+'%'],['Trailing Trigger','+'+c.trailingTriggerPct+'%'],['Trailing Drop',c.trailingDropPct+'%'],['Emergency Drop',c.emergencyPriceDropPct+'%'],['Mgmt Interval',c.managementIntervalMin+'m'],['OOR Wait',c.outOfRangeWaitMinutes+'m'],['Bin Step',c.minBinStep+'-'+c.maxBinStep]];
+  const riskItems=[['Stop Loss',c.stopLossPct+'%'],['Take Profit','+'+c.takeProfitPct+'%'],['Trailing Trigger','+'+c.trailingTriggerPct+'%'],['Trailing Drop',c.trailingDropPct+'%'],['Emergency Drop',c.emergencyPriceDropPct!=null?c.emergencyPriceDropPct+'%':'—'],['Mgmt Interval',c.managementIntervalMin+'m'],['OOR Wait',c.outOfRangeWaitMinutes+'m'],['Bin Step',c.minBinStep+'-'+c.maxBinStep]];
   $('#riskGrid').innerHTML=riskItems.map(([k,v])=>`<div class="cfg-item"><span class="cfg-k">${k}</span><span class="cfg-val">${v||'—'}</span></div>`).join('');
 
   const g=(items)=>items.map(([k,v])=>`<div class="cfg-item"><span class="cfg-k">${k}</span><span class="cfg-val">${v}</span></div>`).join('');
+  const sm=c.stableMode||{}, sat=c.satellite||{}, smPool=(sm.pools&&sm.pools[0])||null, disc=sm.discovery||{};
+  const dual=[
+    ['Stable Mode',sm.enabled?'On':'Off'],
+    ['Stable Amount',sm.amountUsd!=null?'$'+sm.amountUsd:'—'],
+    ['Pinned Pool',smPool?smPool.name:'(none — auto-discover)'],
+    ['Stable SL / TP',smPool?`${smPool.stopLossPct}% / +${smPool.takeProfitPct}%`:'—'],
+    ['Stable Bins',smPool?smPool.binsBelow+' below':'—'],
+    ['Discovery Max Vol',disc.maxVolatility!=null?disc.maxVolatility:'—'],
+    ['Discovery Min TVL',disc.minTvl!=null?'$'+(disc.minTvl/1000)+'k':'—'],
+    ['Satellite Max Pos',sat.maxPositions!=null?sat.maxPositions:'—'],
+    ['Satellite Budget',sat.maxTotalUsd!=null?'$'+sat.maxTotalUsd:'—'],
+    ['Deploy / Pos',(c.deployAmountSol!=null&&c.maxDeployAmount!=null)?`${c.deployAmountSol}–${c.maxDeployAmount} SOL`:'—'],
+  ];
   const strat=[['Strategy',st],['Max Deploy',c.maxDeployAmount+' SOL'],['Max Positions',c.maxPositions],['Position Size',(c.positionSizePct*100)+'%'],['Min SOL to Open',c.minSolToOpen||c.minToOpen||'—'],['Gas Reserve',c.gasReserve!=null?c.gasReserve+' SOL':'—'],['Sol Mode',c.solMode?'Yes':'No'],['Strategy Detail',c.strategyDetail||(st==='spot'?'Single-side SOL':'Dual-side')]];
-  const risk=[['Stop Loss',c.stopLossPct+'%'],['Take Profit','+'+c.takeProfitPct+'%'],['Trailing Trigger','+'+c.trailingTriggerPct+'%'],['Trailing Drop',c.trailingDropPct+'%'],['Emergency Drop',c.emergencyPriceDropPct+'%'],['Min Fee/TVL 24h',c.minFeePerTvl24h+'%'],['Min Age Before Yield',c.minAgeBeforeYieldCheck+'m'],['OOR Wait',c.outOfRangeWaitMinutes+'m'],['OOR Bins to Close',c.outOfRangeBinsToClose],['OOR Cooldown',c.oorCooldownHours!=null?c.oorCooldownHours+'h':'—'],['OOR Cooldown Trigger',c.oorCooldownTriggerCount!=null?c.oorCooldownTriggerCount+'×':'—'],['Repeat Cooldown',c.repeatDeployCooldownEnabled?`${c.repeatDeployCooldownHours}h · ${c.repeatDeployCooldownTriggerCount}× · ${c.repeatDeployCooldownScope}`:'Off'],['Min Claim',c.minClaimAmount!=null?c.minClaimAmount:'—'],['Trailing TP',c.trailingTakeProfit?'On':'Off']];
+  const risk=[['Stop Loss',c.stopLossPct+'%'],['Take Profit','+'+c.takeProfitPct+'%'],['Trailing Trigger','+'+c.trailingTriggerPct+'%'],['Trailing Drop',c.trailingDropPct+'%'],['Emergency Drop',c.emergencyPriceDropPct!=null?c.emergencyPriceDropPct+'%':'—'],['Min Fee/TVL 24h',c.minFeePerTvl24h+'%'],['Min Age Before Yield',c.minAgeBeforeYieldCheck+'m'],['OOR Wait',c.outOfRangeWaitMinutes+'m'],['OOR Bins to Close',c.outOfRangeBinsToClose],['OOR Cooldown',c.oorCooldownHours!=null?c.oorCooldownHours+'h':'—'],['OOR Cooldown Trigger',c.oorCooldownTriggerCount!=null?c.oorCooldownTriggerCount+'×':'—'],['Repeat Cooldown',c.repeatDeployCooldownEnabled?`${c.repeatDeployCooldownHours}h · ${c.repeatDeployCooldownTriggerCount}× · ${c.repeatDeployCooldownScope}`:'Off'],['Min Claim',c.minClaimAmount!=null?c.minClaimAmount:'—'],['Trailing TP',c.trailingTakeProfit?'On':'Off']];
   const screen=[['Min TVL','$'+c.minTvl],['Max TVL','$'+c.maxTvl],['Min Volume','$'+c.minVolume],['Min Organic',c.minOrganic],['Min Quote Organic',c.minQuoteOrganic],['Min Holders',c.minHolders],['Min MCap','$'+c.minMcap],['Max MCap','$'+c.maxMcap],['Bin Step',c.minBinStep+'-'+c.maxBinStep],['Max Bot Holders',c.maxBotHoldersPct+'%'],['Max Top 10%',c.maxTop10Pct+'%'],['Max Volatility',c.maxVolatility!=null?c.maxVolatility:'—'],['Min Token Fees',c.minTokenFeesSol+' SOL'],['Min Fee/Active TVL',c.minFeeActiveTvlRatio!=null?c.minFeeActiveTvlRatio:'—'],['Min Token Age',c.minTokenAgeHours!=null?c.minTokenAgeHours+'h':'—'],['Max Token Age',c.maxTokenAgeHours!=null?c.maxTokenAgeHours+'h':'—'],['Min Vol to Rebalance',c.minVolumeToRebalance!=null?'$'+c.minVolumeToRebalance:'—'],['Screening Source',c.screeningSource||'—'],['Timeframe',c.timeframe],['Category',c.category]];
   const sched=[['Screening Interval',c.screeningIntervalMin+'m'],['Management Interval',c.managementIntervalMin+'m'],['Health Check Interval',c.healthCheckIntervalMin+'m'],['Screening Model',c.screeningModel],['Management Model',c.managementModel],['General Model',c.generalModel],['Temperature',c.temperature],['Max Tokens',c.maxTokens],['Max Steps',c.maxSteps]];
   const int=[['Discord Signals',c.useDiscordSignals?'On':'Off'],['Discord Mode',c.discordSignalMode],['HiveMind URL',c.hiveMindUrl||'—'],['LPAgent Relay',c.lpAgentRelayEnabled?'On':'Off'],['PnL Source',c.pnlSource],['Darwin',c.darwinEnabled?'On':'Off'],['Darwin Window',c.darwinWindowDays+' days'],['Darwin Boost',c.darwinBoost!=null?c.darwinBoost+'×':'—'],['Darwin Decay',c.darwinDecay!=null?c.darwinDecay+'×':'—'],['Darwin Floor',c.darwinFloor!=null?c.darwinFloor+'×':'—'],['Darwin Ceiling',c.darwinCeiling!=null?c.darwinCeiling+'×':'—'],['Darwin Min Samples',c.darwinMinSamples!=null?c.darwinMinSamples:'—'],['Darwin Recalc Every',c.darwinRecalcEvery!=null?c.darwinRecalcEvery:'—']];
+  if($('#fullCfgDual'))$('#fullCfgDual').innerHTML=g(dual);
   $('#fullCfgStrategy').innerHTML=g(strat);
   $('#fullCfgRisk').innerHTML=g(risk);
   $('#fullCfgScreen').innerHTML=g(screen);
