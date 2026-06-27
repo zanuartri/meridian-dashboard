@@ -117,7 +117,7 @@ if not ALCHEMY_API_KEY:
         except:
             pass
 
-PAPER = Path("/root/meridian/paper")
+PAPER = Path(os.environ.get("MERIDIAN_PAPER_PATH", str(MERIDIAN / "paper")))
 
 def get_meridian(paper=False):
     """Return the active meridian path (real or paper)."""
@@ -1044,6 +1044,11 @@ async def dashboard(paper: bool = Query(False)):
         "cooldowns": cooldowns,
         "blocklist_count": blocklist_count,
         "config": config_summary,
+        # Feature flags so the UI degrades gracefully for upstream-default setups.
+        "features": {
+            "paper": PAPER.exists(),
+            "dual_mode": bool(config.get("stableMode") or config.get("satellite")),
+        },
     }
 
 @app.get("/api/wallet")

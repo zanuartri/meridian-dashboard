@@ -582,11 +582,11 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
         <div class="term-title"><div class="term-dot"></div><h2>Settings</h2></div>
       </div>
       <div class="settings-grid">
-        <div class="cfg-box"><h3><span style="color:var(--blue)">🟦</span> Dual Mode (Stable + Satellite)</h3><div class="cfg-grid" id="fullCfgDual"></div></div>
-        <div class="cfg-box"><h3><span style="color:var(--grn)">⚡</span> Strategy</h3><div class="cfg-grid" id="fullCfgStrategy"></div></div>
+        <div class="cfg-box" id="dualModeBox" style="display:none"><h3><span style="color:var(--blue)">🟦</span> Dual Mode (Stable + Satellite)</h3><div class="cfg-grid" id="fullCfgDual"></div></div>
         <div class="cfg-box"><h3><span style="color:var(--red)">🛡</span> Risk & Management</h3><div class="cfg-grid" id="fullCfgRisk"></div></div>
-        <div class="cfg-box"><h3><span style="color:var(--orange)">⏱</span> Schedule & Models</h3><div class="cfg-grid" id="fullCfgSchedule"></div></div>
+        <div class="cfg-box"><h3><span style="color:var(--grn)">⚡</span> Strategy</h3><div class="cfg-grid" id="fullCfgStrategy"></div></div>
         <div class="cfg-box"><h3><span style="color:var(--cyan)">🔗</span> Integrations</h3><div class="cfg-grid" id="fullCfgInt"></div></div>
+        <div class="cfg-box"><h3><span style="color:var(--orange)">⏱</span> Schedule & Models</h3><div class="cfg-grid" id="fullCfgSchedule"></div></div>
         <div class="cfg-box"><h3><span style="color:var(--blue)">🔍</span> Screening Filters</h3><div class="cfg-grid" id="fullCfgScreen"></div></div>
       </div>
     </div>
@@ -696,6 +696,8 @@ function renderAll(d){
   renderWinChart(d);
   renderFeeChart(d.daily);
   renderConfig(d.config);
+  // Feature flags — hide PAPER toggle when no paper agent exists (upstream-default setups).
+  if(d.features){const bp=$('#btnPaper');if(bp)bp.style.display=d.features.paper?'':'none';}
   renderPositions(d.positions);
   renderAlloc(d.positions);
   renderRecentTrades(d.history);
@@ -882,7 +884,12 @@ function renderConfig(c){
   const screen=[['Min TVL','$'+c.minTvl],['Max TVL','$'+c.maxTvl],['Min Volume','$'+c.minVolume],['Min Organic',c.minOrganic],['Min Quote Organic',c.minQuoteOrganic],['Min Holders',c.minHolders],['Min MCap','$'+c.minMcap],['Max MCap','$'+c.maxMcap],['Bin Step',c.minBinStep+'-'+c.maxBinStep],['Max Bot Holders',c.maxBotHoldersPct+'%'],['Max Top 10%',c.maxTop10Pct+'%'],['Max Volatility',c.maxVolatility!=null?c.maxVolatility:'—'],['Min Token Fees',c.minTokenFeesSol+' SOL'],['Min Fee/Active TVL',c.minFeeActiveTvlRatio!=null?c.minFeeActiveTvlRatio:'—'],['Min Token Age',c.minTokenAgeHours!=null?c.minTokenAgeHours+'h':'—'],['Max Token Age',c.maxTokenAgeHours!=null?c.maxTokenAgeHours+'h':'—'],['Min Vol to Rebalance',c.minVolumeToRebalance!=null?'$'+c.minVolumeToRebalance:'—'],['Screening Source',c.screeningSource||'—'],['Timeframe',c.timeframe],['Category',c.category]];
   const sched=[['Screening Interval',c.screeningIntervalMin+'m'],['Management Interval',c.managementIntervalMin+'m'],['Health Check Interval',c.healthCheckIntervalMin+'m'],['Screening Model',c.screeningModel],['Management Model',c.managementModel],['General Model',c.generalModel],['Temperature',c.temperature],['Max Tokens',c.maxTokens],['Max Steps',c.maxSteps]];
   const int=[['Discord Signals',c.useDiscordSignals?'On':'Off'],['Discord Mode',c.discordSignalMode],['HiveMind URL',c.hiveMindUrl||'—'],['LPAgent Relay',c.lpAgentRelayEnabled?'On':'Off'],['PnL Source',c.pnlSource],['Darwin',c.darwinEnabled?'On':'Off'],['Darwin Window',c.darwinWindowDays+' days'],['Darwin Boost',c.darwinBoost!=null?c.darwinBoost+'×':'—'],['Darwin Decay',c.darwinDecay!=null?c.darwinDecay+'×':'—'],['Darwin Floor',c.darwinFloor!=null?c.darwinFloor+'×':'—'],['Darwin Ceiling',c.darwinCeiling!=null?c.darwinCeiling+'×':'—'],['Darwin Min Samples',c.darwinMinSamples!=null?c.darwinMinSamples:'—'],['Darwin Recalc Every',c.darwinRecalcEvery!=null?c.darwinRecalcEvery:'—']];
-  if($('#fullCfgDual'))$('#fullCfgDual').innerHTML=g(dual);
+  // Dual Mode is OUR feature — only show it when config actually has stable/satellite.
+  // Upstream-default users (no stableMode/satellite) see the standard layout.
+  const hasDual=!!(c.stableMode||c.satellite);
+  const dualBox=$('#dualModeBox');
+  if(dualBox)dualBox.style.display=hasDual?'':'none';
+  if(hasDual&&$('#fullCfgDual'))$('#fullCfgDual').innerHTML=g(dual);
   $('#fullCfgStrategy').innerHTML=g(strat);
   $('#fullCfgRisk').innerHTML=g(risk);
   $('#fullCfgScreen').innerHTML=g(screen);
