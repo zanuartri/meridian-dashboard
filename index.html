@@ -395,10 +395,6 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
         Settings
       </div>
     </nav>
-    <div class="sb-mode-wrap" style="padding:8px 16px">
-      <div id="btnReal" class="sb-mode-btn on" onclick="event.stopPropagation();setPaperMode(false)">◉ LIVE</div>
-      <div id="btnPaper" class="sb-mode-btn" onclick="event.stopPropagation();setPaperMode(true)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;vertical-align:-1px"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> PAPER</div>
-    </div>
     <div class="sb-ft">
       <a href="/logout" style="display:flex;align-items:center;gap:8px;padding:8px 16px 8px 0;font-size:12px;font-weight:500;color:#666;cursor:pointer;transition:all .1s;text-decoration:none;font-family:var(--sans)" onmouseover="this.style.color='#ff5252'" onmouseout="this.style.color='#666'">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -613,10 +609,9 @@ const utcDateStr=(d)=>{const dt=new Date(d instanceof Date?d:new Date(d));return
 const utcNow=()=>new Date();
 
 let allH=[],pgSz=15,pgCur=1,data=null,curPage='overview';
-let cache={live:null,paper:null};
+let cache={live:null};
 let dailyView='usd',calView='usd',perfView='usd';
-let paperMode=false;
-let charts={};
+@@
 
 function setDailyView(v){
   dailyView=v;
@@ -639,23 +634,9 @@ function setPerfView(v){
   if(data&&data.daily)renderChart(data.daily);
 }
 
-async function fj(p){try{const url=paperMode?p+(p.includes('?')?'&':'?')+'paper=true&_='+Date.now():p+'?_='+Date.now();return(await fetch(url)).json()}catch{return null}}
+async function fj(p){try{const url=p+'?_='+Date.now();return(await fetch(url)).json()}catch{return null}}
 
-function setPaperMode(v){
-  paperMode=v;
-  data=cache[v?'paper':'live'];
-  document.getElementById('btnPaper').classList.toggle('on',v);
-  document.getElementById('btnReal').classList.toggle('on',!v);
-  const h2=document.getElementById('statusH2');
-  if(h2){h2.textContent=v?'Meridian Paper Agent':'Meridian Agent Active';h2.style.color=v?'#f0a':'';}
-  const dot=document.getElementById('statusDot');
-  if(dot)dot.style.background=v?'#f0a':'';
-  if(data)renderAll(data);
-  if(curPage==='candidates')loadPoolCandidates();
-  if(curPage==='activity')loadCandidates();
-  if(curPage==='learning')loadLearning();
-  if(curPage==='calendar')loadCalendar();
-}
+
 
 // ═══ NAV ═══
 $$('.nav-i').forEach(el=>{
@@ -676,13 +657,9 @@ $$('.nav-i').forEach(el=>{
 // ═══ FETCH + RENDER ═══
 async function fetchBoth(){
   const ts=Date.now();
-  const [live,papers]=await Promise.all([
-    fetch('/api/dashboard?_='+ts).then(r=>r.json()).catch(()=>null),
-    fetch('/api/dashboard?paper=true&_='+ts).then(r=>r.json()).catch(()=>null)
-  ]);
+  const live=await fetch('/api/dashboard?_='+ts).then(r=>r.json()).catch(()=>null);
   if(live)cache.live=live;
-  if(papers)cache.paper=papers;
-  data=cache[paperMode?'paper':'live'];
+  data=cache.live;
   if(data)renderAll(data);
 }
 
@@ -696,8 +673,7 @@ function renderAll(d){
   renderWinChart(d);
   renderFeeChart(d.daily);
   renderConfig(d.config);
-  // Feature flags — hide PAPER toggle when no paper agent exists (upstream-default setups).
-  if(d.features){const bp=$('#btnPaper');if(bp)bp.style.display=d.features.paper?'':'none';}
+
   renderPositions(d.positions);
   renderAlloc(d.positions);
   renderRecentTrades(d.history);
@@ -1002,13 +978,12 @@ function renderStatus(d){
     if(pill){pill.textContent='Stale';pill.classList.remove('on');pill.classList.add('warn');}
     if(dot)dot.style.background='var(--orange)';
     if(live){live.textContent='● STALE';live.style.color='var(--orange)';}
-    if(h2&&!paperMode)h2.textContent='Meridian — Last seen '+(stale<60?Math.round(stale)+'m':(stale/60).toFixed(1)+'h')+' ago';
-    if(h2&&paperMode)h2.textContent='Meridian Paper — Last seen '+(stale<60?Math.round(stale)+'m':(stale/60).toFixed(1)+'h')+' ago';
+    if(h2)h2.textContent='Meridian — Last seen '+(stale<60?Math.round(stale)+'m':(stale/60).toFixed(1)+'h')+' ago';
   }else{
     if(pill){pill.textContent='Online';pill.classList.add('on');pill.classList.remove('warn');}
-    if(dot)dot.style.background=paperMode?'#f0a':'';
-    if(live){live.textContent=paperMode?'● PAPER':'● LIVE';live.style.color=paperMode?'#f0a':'';}
-    if(h2){h2.textContent=paperMode?'Meridian Paper Agent':'Meridian Agent Active';h2.style.color=paperMode?'#f0a':'';}
+    if(dot)dot.style.background='';
+    if(live){live.textContent='● LIVE';live.style.color='';}
+    if(h2){h2.textContent='Meridian Agent Active';h2.style.color='';}
   }
 }
 
