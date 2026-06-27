@@ -427,6 +427,12 @@ def fetch_deposits():
     if not wallet:
         return cache.get("stats", {})
 
+    # Skip RPC scan if manual deposit data already exists
+    # (on-chain detector misclassifies position close returns as deposits)
+    manual_deps = [d for d in cache.get("deposits", []) if d.get("from") != "on-chain"]
+    if len(manual_deps) >= 2:
+        return cache.get("stats", {})
+
     # Use Alchemy RPC (preferred) or Helius RPC fallback
     if ALCHEMY_API_KEY:
         rpc_url = f"https://solana-mainnet.g.alchemy.com/v2/{ALCHEMY_API_KEY}"
@@ -585,8 +591,9 @@ def fetch_deposits():
             cache["last_sig"] = sigs[0].get("signature", cache.get("last_sig"))
         cache["last_fetch"] = time.time()
 
-        # Compute stats (weighted average deposit price)
-        deposits = cache["deposits"]
+        # Compute stats — only count manual deposits, skip RPC auto-detected
+        # (on-chain detector misclassifies position close returns as deposits)
+        deposits = [d for d in cache["deposits"] if d.get("from") != "on-chain"]
         total_sol = sum(d.get("amount_sol", 0) for d in deposits)
         weighted_usd = sum(
             d.get("amount_sol", 0) * d.get("sol_price", 0)

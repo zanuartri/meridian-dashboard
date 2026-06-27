@@ -731,17 +731,15 @@ function renderStats(d){
   const depChangeColor=depChange>=0?'grn':'red';
   const portColor=portfolioSol!=null?(portfolioSol>=0?'grn':'red'):'t3';
 
+  const portfolioCard = portfolioUsd!=null
+    ? `<div class="stat"><div class="stat-l">Portfolio<span class="stat-info" onclick="showPortfolioModal()" title="Portfolio breakdown">i</span></div><div class="stat-v ${portColor}">${portfolioUsd>=0?'+':''}$${f(Math.abs(portfolioUsd))}</div><div class="stat-sub">$${f(portfolioTotal)} now / $${f(d.deposit_stats?.total_usd||0)} in</div></div>`
+    : '';
   let statsHtml=`
     <div class="stat"><div class="stat-l">Open</div><div class="stat-v blue">${d.position_count}/${d.max_positions}</div><div class="stat-sub">positions</div></div>
     <div class="stat"><div class="stat-l">Unrealized</div><div class="stat-v ${unrColor}">${usd(unrealized)}</div><div class="stat-sub">${sol(unrealizedSol)}</div></div>
-    <div class="stat"><div class="stat-l">Unclaimed</div><div class="stat-v cyan">$${f(unclaimed,2)}</div><div class="stat-sub">${f(unclaimedSol,6)} SOL</div></div>
     <div class="stat"><div class="stat-l">Net PnL</div><div class="stat-v ${pnlColor}">${usd(pnl)}</div><div class="stat-sub">${sol(pnlSol)}</div></div>
-    <div class="stat"><div class="stat-l">PnL</div><div class="stat-v ${realPnlColor}">${usd(realPnl)}</div><div class="stat-sub">${f(totalPnlSol,4)} SOL @ $${f(solPrice,0)}</div></div>
+    ${portfolioCard}
   `;
-  if(!paperMode){
-    const netIn=ds.total_usd - (ds.withdrawn_usd||0);
-    statsHtml+=`<div class="stat"><div class="stat-l">Portfolio<span class="stat-info" onclick="showPortfolioModal()" title="Portfolio breakdown">i</span></div><div class="stat-v ${portColor}">${portfolioUsd!=null?usd(portfolioUsd):'—'}</div><div class="stat-sub">${portfolioTotal!=null?'$'+f(portfolioTotal,0)+' now':''}${ds.total_usd?' / $'+f(netIn,0)+' in':''}</div></div>`;
-  }
   $('#statRow').innerHTML=statsHtml;
 }
 let _lastPortfolioComponents=null;
