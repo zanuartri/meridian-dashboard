@@ -1054,7 +1054,6 @@ async def dashboard(paper: bool = Query(False)):
         # Feature flags so the UI degrades gracefully for upstream-default setups.
         "features": {
             "paper": PAPER.exists(),
-            "dual_mode": bool(config.get("stableMode") or config.get("satellite")),
         },
     }
 
