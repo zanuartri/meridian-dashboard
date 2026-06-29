@@ -1015,6 +1015,21 @@ async def candidates_latest(paper: bool = Query(False)):
                 continue
         # Sort newest first
         recent.sort(key=lambda x: x.get("ts", ""), reverse=True)
+        # Add pool_display for frontend rendering
+        import re as _re
+        for d in recent:
+            pool_display = d.get("pool_name") or ""
+            if not pool_display:
+                for r in (d.get("rejected") or []):
+                    m = _re.match(r"(\S+-(?:SOL|USDC))", str(r))
+                    if m:
+                        pool_display = m.group(1)
+                        break
+            if not pool_display and d.get("reason"):
+                m = _re.match(r"-?\s*(\S+-(?:SOL|USDC))", str(d["reason"]))
+                if m:
+                    pool_display = m.group(1)
+            d["pool_display"] = pool_display or "—"
         return {
             "candidates": recent,
             "updatedAt": recent[0].get("ts") if recent else None,

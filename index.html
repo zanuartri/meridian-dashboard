@@ -1146,14 +1146,14 @@ async function loadPoolCandidates(){
   
   let h='<table><thead><tr><th>Pool</th><th style="text-align:center">Type</th><th>Detail</th><th>Risks</th><th style="text-align:center">Time</th></tr></thead><tbody>';
   for(const c of candidates){
-    const name=c.pool_name||c.pool?.slice(0,8)+'?'||'?';
+    const name=c.pool_display||(c.pool_name||(c.pool?c.pool.slice(0,8)+'?':'?'));
     const type=c.type||'?';
     const typeClass=type==='deploy'?'grn':(type==='close'?'cyan':'red');
     const detail=c.summary||c.reason||'—';
     const risks=(c.risks||[]).slice(0,2).join(', ')||'—';
     const ts=c.ts?ago(c.ts):'—';
     h+=`<tr>
-      <td class="pn" style="white-space:nowrap"><a href="https://app.meteora.ag/dlmm/${c.pool||''}" target="_blank" style="color:var(--tx);text-decoration:none">${name}</a></td>
+      <td class="pn" style="white-space:nowrap">${c.pool?`<a href="https://app.meteora.ag/dlmm/${c.pool}" target="_blank" style="color:var(--tx);text-decoration:none">${name}</a>`:name}</td>
       <td style="text-align:center"><span style="color:var(--${typeClass});font-size:10px;text-transform:uppercase">${type}</span></td>
       <td style="font-size:10px;color:var(--t2);max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${detail}</td>
       <td style="font-size:10px;color:var(--t3);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${risks}</td>
