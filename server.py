@@ -991,16 +991,34 @@ async def pool_candidates(paper: bool = Query(False)):
 
 @app.get("/api/candidates-latest")
 async def candidates_latest(paper: bool = Query(False)):
-    """Return latest cached candidates from Meridian screening (candidates-cache.json)."""
-    cache_path = get_meridian(paper) / "candidates-cache.json"
-    if not cache_path.exists():
+    """Return recent screening decisions from decision-log.json (last 30 minutes)."""
+    log_path = get_meridian(paper) / "decision-log.json"
+    if not log_path.exists():
         return {"candidates": [], "updatedAt": None, "total": 0}
     try:
-        data = json.loads(cache_path.read_text())
+        data = json.loads(log_path.read_text())
+        decisions = data.get("decisions", []) if isinstance(data, dict) else []
+        # Filter recent: last 30 minutes
+        from datetime import datetime as dt, timezone, timedelta
+        now = dt.now(timezone.utc)
+        cutoff = now - timedelta(minutes=30)
+        recent = []
+        for d in decisions:
+            ts = d.get("ts", "")
+            if not ts:
+                continue
+            try:
+                t = dt.fromisoformat(ts.replace("Z", "+00:00"))
+                if t >= cutoff:
+                    recent.append(d)
+            except:
+                continue
+        # Sort newest first
+        recent.sort(key=lambda x: x.get("ts", ""), reverse=True)
         return {
-            "candidates": data.get("candidates", []),
-            "updatedAt": data.get("updatedAt"),
-            "total": len(data.get("candidates", [])),
+            "candidates": recent,
+            "updatedAt": recent[0].get("ts") if recent else None,
+            "total": len(recent),
         }
     except Exception:
         return {"candidates": [], "updatedAt": None, "total": 0}
