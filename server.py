@@ -758,6 +758,66 @@ async def wallet_endpoint():
         return {"available": False, "has_api_key": False}
     return {"available": True, "has_api_key": False, **wb}
 
+# ─── Live Positions from Meteora API (public, no API key) ──────
+_live_positions_cache = {"data": None, "ts": 0}
+
+@app.get("/api/live-positions")
+async def live_positions():
+    """Fetch live PnL from Meteora portfolio API (public). Cached 15s to avoid rate limit."""
+    import time as _time
+    now = _time.time()
+    if _live_positions_cache["data"] and now - _live_positions_cache["ts"] < 15:
+        return _live_positions_cache["data"]
+
+    wallet = WALLET
+    if not wallet:
+        state = load("state.json")
+        wallet = state.get("owner", "") or state.get("wallet", "")
+    if not wallet:
+        wb = latest_wallet_balance()
+        if wb:
+            wallet = wb.get("wallet", "")
+    if not wallet:
+        return {"error": "No wallet configured", "positions": []}
+
+    try:
+        url = f"https://dlmm.datapi.meteora.ag/portfolio/open?user={wallet}"
+        req = urllib.request.Request(url, headers={"User-Agent": "MeridianDashboard/1.0"})
+        resp = urllib.request.urlopen(req, timeout=15)
+        data = json.loads(resp.read())
+
+        pools = data.get("pools", [])
+        total_unrealized = 0
+        total_unclaimed = 0
+        total_unrealized_sol = 0
+        total_unclaimed_sol = 0
+
+        for pool in pools:
+            pnl_val = float(pool.get("pnl", 0) or 0)
+            unclaimed = float(pool.get("unclaimedFees", 0) or 0)
+            pnl_sol = float(pool.get("pnlSol", 0) or 0)
+            unclaimed_sol = float(pool.get("unclaimedFeesSol", 0) or 0)
+            total_unrealized += pnl_val
+            total_unclaimed += unclaimed
+            total_unrealized_sol += pnl_sol
+            total_unclaimed_sol += unclaimed_sol
+
+        result = {
+            "positions": pools,
+            "unrealized_pnl_usd": round(total_unrealized, 2),
+            "unrealized_pnl_sol": round(total_unrealized_sol, 6),
+            "unclaimed_fees_usd": round(total_unclaimed, 2),
+            "unclaimed_fees_sol": round(total_unclaimed_sol, 6),
+            "sol_price": data.get("solPrice", 0),
+            "fetched_at": datetime.now(timezone.utc).isoformat(),
+        }
+        _live_positions_cache["data"] = result
+        _live_positions_cache["ts"] = now
+        return result
+    except Exception as e:
+        print(f"[LivePositions] Error: {e}")
+        return {"error": str(e), "positions": []}
+
 @app.get("/api/config")
 async def get_config():
     config = load_dashboard_config()
