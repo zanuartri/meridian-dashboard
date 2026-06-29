@@ -88,35 +88,6 @@ body{font-family:'JetBrains Mono',monospace;background:#0d0d0d;color:#e5e5e5;dis
 </html>"""
 WALLET = os.environ.get("MERIDIAN_WALLET", "")
 
-# Load Helius API key from Meridian .env
-HELIUS_API_KEY = ""
-ALCHEMY_API_KEY = ""
-_meridian_env = MERIDIAN / ".env"
-if _meridian_env.exists():
-    try:
-        for line in _meridian_env.read_text().splitlines():
-            line = line.strip()
-            if line.startswith("HELIUS_API_KEY="):
-                HELIUS_API_KEY = line.split("=", 1)[1].strip().strip('"').strip("'")
-            if line.startswith("ALCHEMY_API_KEY="):
-                ALCHEMY_API_KEY = line.split("=", 1)[1].strip().strip('"').strip("'")
-    except:
-        pass
-# Fallback: check .env.bak for Alchemy key
-if not ALCHEMY_API_KEY:
-    _bak = MERIDIAN / ".env.bak"
-    if _bak.exists():
-        try:
-            import re
-            for line in _bak.read_text().splitlines():
-                if "WRITE_RPC_URLS" in line and "alchemy.com" in line:
-                    m = re.search(r'alchemy\.com/v2/([a-zA-Z0-9_-]+)', line)
-                    if m:
-                        ALCHEMY_API_KEY = m.group(1)
-                        break
-        except:
-            pass
-
 PAPER = Path(os.environ.get("MERIDIAN_PAPER_PATH", str(MERIDIAN / "paper")))
 
 def get_meridian(paper=False):
@@ -198,66 +169,45 @@ def latest_wallet_balance():
 
 
 def fetch_wallet_rpc():
-    """Fetch wallet balance directly via Helius RPC API.
+    """Fetch wallet balance directly via public Solana RPC (no API key needed).
     Returns SOL balance, SOL price, and token accounts."""
-    config = load_dashboard_config()
-    if not config.get("wallet_rpc_enabled", False) or not HELIUS_API_KEY:
-        return None
-
-    # Derive wallet address from state or config
     wallet = WALLET
     if not wallet:
         state = load("state.json")
         wallet = state.get("owner", "") or state.get("wallet", "")
     if not wallet:
-        # Try to get from latest log
         wb = latest_wallet_balance()
         if wb:
             wallet = wb.get("wallet", "")
-
     if not wallet:
         return None
 
-    try:
-        # Get SOL balance via getBalance
-        balance_url = f"https://mainnet.helius-rpc.com/?api-key={HELIUS_API_KEY}"
-        balance_payload = {
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "getBalance",
-            "params": [wallet]
-        }
-        data = json.dumps(balance_payload).encode("utf-8")
-        req = urllib.request.Request(balance_url, data=data, headers={"Content-Type": "application/json"})
-        resp = urllib.request.urlopen(req, timeout=10)
-        balance_result = json.loads(resp.read())
+    RPC_URL = "https://api.mainnet-beta.solana.com"
 
+    def rpc_call(method, params):
+        payload = json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": params}).encode()
+        req = urllib.request.Request(RPC_URL, data=payload, headers={"Content-Type": "application/json"})
+        resp = urllib.request.urlopen(req, timeout=15)
+        return json.loads(resp.read())
+
+    try:
+        # Get SOL balance
+        balance_result = rpc_call("getBalance", [wallet])
         if "result" not in balance_result:
             return None
-
         lamports = balance_result["result"]["value"]
         sol = lamports / 1e9
 
-        # Get SOL price (cached, with Jupiter fallback)
+        # Get SOL price (cached)
         sol_price = get_sol_price()
-
         sol_usd = sol * sol_price
 
-        # Get token accounts via getTokenAccountsByOwner
-        token_payload = {
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "getTokenAccountsByOwner",
-            "params": [
-                wallet,
-                {"programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"},
-                {"encoding": "jsonParsed"}
-            ]
-        }
-        token_data = json.dumps(token_payload).encode("utf-8")
-        token_req = urllib.request.Request(balance_url, data=token_data, headers={"Content-Type": "application/json"})
-        token_resp = urllib.request.urlopen(token_req, timeout=10)
-        token_result = json.loads(token_resp.read())
+        # Get token accounts
+        token_result = rpc_call("getTokenAccountsByOwner", [
+            wallet,
+            {"programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"},
+            {"encoding": "jsonParsed"}
+        ])
 
         tokens = []
         total_usd = sol_usd
@@ -272,7 +222,6 @@ def fetch_wallet_rpc():
             if balance == 0:
                 continue
 
-            # Known tokens
             symbol = mint[:8]
             usd_value = 0
 
@@ -286,9 +235,6 @@ def fetch_wallet_rpc():
             elif mint == "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB":
                 symbol = "USDT"
                 usd_value = balance
-            else:
-                # Try to get price for other tokens (skip for now)
-                usd_value = 0
 
             total_usd += usd_value
             tokens.append({
@@ -310,7 +256,7 @@ def fetch_wallet_rpc():
         }
 
     except Exception as e:
-        print(f"[RPC] Error fetching wallet balance: {e}")
+        print(f"[RPC] Error fetching wallet balance via public RPC: {e}")
         return None
 
 _sol_price_cache = {"price": 0, "ts": 0}  # cache for 60s to avoid CoinGecko 429
@@ -357,12 +303,6 @@ def load_deposits_cache():
             pass
     return {"deposits": [], "last_sig": None, "last_fetch": 0, "stats": {}}
 
-def save_deposits_cache(cache):
-    try:
-        DEPOSITS_FILE.write_text(json.dumps(cache, indent=2))
-    except Exception as e:
-        print(f"[Deposits] Cache save error: {e}")
-
 def get_wallet_addr():
     """Get wallet address from state.json or wallet balance logs."""
     state = load("state.json")
@@ -372,256 +312,6 @@ def get_wallet_addr():
         if wb:
             w = wb.get("wallet", "")
     return w
-
-_sol_hourly_cache = {}  # { "YYYY-MM-DD": { hour: price } }
-
-def fetch_sol_hourly_prices(date_str):
-    """Fetch all 1h SOL prices for a date (DD-MM-YYYY) from yfinance.
-    Returns dict {hour: close_price}. Caches in memory to avoid repeated calls.
-    """
-    # Convert DD-MM-YYYY to YYYY-MM-DD for yfinance
-    from datetime import datetime as dt
-    d = dt.strptime(date_str, "%d-%m-%Y")
-    yf_date = d.strftime("%Y-%m-%d")
-
-    if yf_date in _sol_hourly_cache:
-        return _sol_hourly_cache[yf_date]
-
-    try:
-        import yfinance as yf
-        start = yf_date
-        end = (d + timedelta(days=1)).strftime("%Y-%m-%d")
-        hist = yf.Ticker("SOL-USD").history(start=start, end=end, interval="1h")
-        hourly = {}
-        for idx in hist.index:
-            hourly[idx.hour] = float(hist.loc[idx, "Close"])
-        _sol_hourly_cache[yf_date] = hourly
-        return hourly
-    except Exception as e:
-        print(f"[Deposit Price] yfinance error for {date_str}: {e}")
-        return {}
-
-def fetch_historical_sol_price(date_str, hour=None):
-    """Fetch SOL price for a specific date/hour. Falls back to daily open if no hourly data."""
-    hourly = fetch_sol_hourly_prices(date_str)
-    if hour is not None and hour in hourly:
-        return hourly[hour]
-    # Fallback: first available hour or 0
-    if hourly:
-        return next(iter(hourly.values()))
-    return 0
-
-def fetch_deposits():
-    """Fetch deposit history via Alchemy RPC (getSignaturesForAddress + getTransaction).
-    Detects incoming SOL transfers (not swaps/LP/claims).
-    Caches in deposits.json, refreshes at most once per hour.
-    API usage: ~1-2 Alchemy calls + ~N CoinGecko calls per refresh.
-    """
-    cache = load_deposits_cache()
-
-    # Rate limit: don't fetch more than once per hour
-    if time.time() - cache.get("last_fetch", 0) < DEPOSIT_CACHE_TTL:
-        return cache.get("stats", {})
-
-    wallet = get_wallet_addr()
-    if not wallet:
-        return cache.get("stats", {})
-
-    # Skip RPC scan if manual deposit data already exists
-    # (on-chain detector misclassifies position close returns as deposits)
-    manual_deps = [d for d in cache.get("deposits", []) if d.get("from") != "on-chain"]
-    if len(manual_deps) >= 2:
-        return cache.get("stats", {})
-
-    # Use Alchemy RPC (preferred) or Helius RPC fallback
-    if ALCHEMY_API_KEY:
-        rpc_url = f"https://solana-mainnet.g.alchemy.com/v2/{ALCHEMY_API_KEY}"
-        print(f"[Deposits] Using Alchemy RPC")
-    elif HELIUS_API_KEY:
-        rpc_url = f"https://mainnet.helius-rpc.com/?api-key={HELIUS_API_KEY}"
-        print(f"[Deposits] Using Helius RPC fallback")
-    else:
-        print(f"[Deposits] No RPC available (no Alchemy or Helius key)")
-        return cache.get("stats", {})
-
-    def rpc_call(method, params):
-        payload = json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": params}).encode()
-        req = urllib.request.Request(rpc_url, data=payload, headers={"Content-Type": "application/json"})
-        resp = urllib.request.urlopen(req, timeout=15)
-        return json.loads(resp.read())
-
-    try:
-        # Backfill mode: only on first run (empty cache)
-        has_cache = cache.get("last_sig") or len(cache.get("deposits", [])) > 0
-        is_backfill = not has_cache
-        MAX_BACKFILL_TXS = 500  # scan up to 500 txs on first run
-        BATCH_SIZE = 100
-        
-        all_sigs = []
-        before_sig = None
-        
-        if is_backfill:
-            print(f"[Deposits] Backfill mode: scanning up to {MAX_BACKFILL_TXS} transactions...")
-            while len(all_sigs) < MAX_BACKFILL_TXS:
-                params = [wallet, {"limit": BATCH_SIZE}]
-                if before_sig:
-                    params[1]["before"] = before_sig
-                result = rpc_call("getSignaturesForAddress", params)
-                batch = result.get("result", [])
-                if not batch:
-                    break
-                all_sigs.extend(batch)
-                before_sig = batch[-1].get("signature")
-                print(f"[Deposits] Backfill: {len(all_sigs)} signatures scanned...")
-                time.sleep(0.5)  # Rate limit: stay under 500 CU/s
-            sigs = all_sigs
-            print(f"[Deposits] Backfill complete: {len(sigs)} total signatures")
-        else:
-            # Normal mode: only fetch new transactions
-            sig_params = [wallet, {"limit": BATCH_SIZE}]
-            if cache.get("last_sig"):
-                sig_params[1]["before"] = cache["last_sig"]
-            sig_result = rpc_call("getSignaturesForAddress", sig_params)
-            sigs = sig_result.get("result", [])
-
-        if not sigs:
-            cache["last_fetch"] = time.time()
-            save_deposits_cache(cache)
-            return cache.get("stats", {})
-
-        # Step 2: Get transaction details (batch of 5 to stay under rate limit)
-        existing_sigs = {d.get("sig", "") for d in cache["deposits"]}
-        new_deposits = []
-
-        # Known programs to exclude (LP operations, swaps, DeFi interactions)
-        EXCLUDE_PROGRAMS = {
-            "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo",  # Meteora DLMM
-            "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",  # Jupiter v6
-            "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8",  # Raydium AMM
-            "DF1ow4tspfHX9JwWJsAb9epbkA8hmp",                # Meteora pool operations
-            "L2TExMFKdjpN9kozasaurPirfHy9P8",                # Meteora DLMM helper
-        }
-
-        for sig_obj in sigs:
-            sig = sig_obj.get("signature", "")
-            if sig in existing_sigs:
-                continue
-            if sig_obj.get("err"):  # Skip failed transactions
-                continue
-
-            # Get transaction details
-            try:
-                tx_result = rpc_call("getTransaction", [sig, {"encoding": "jsonParsed", "maxSupportedTransactionVersion": 0}])
-                tx = tx_result.get("result")
-                if not tx:
-                    continue
-
-                # Skip if transaction involves excluded programs (top-level or inner instructions)
-                accounts = [a.get("pubkey", "") if isinstance(a, dict) else str(a) for a in tx.get("transaction", {}).get("message", {}).get("accountKeys", [])]
-                meta_temp = tx.get("meta", {})
-                inner_programs = set()
-                for inner_group in meta_temp.get("innerInstructions", []):
-                    for inner_inst in inner_group.get("instructions", []):
-                        inner_programs.add(inner_inst.get("programId", ""))
-                all_programs = set(accounts) | inner_programs
-                if any(acc in EXCLUDE_PROGRAMS for acc in all_programs):
-                    continue
-
-                # Only count simple SOL transfers as deposits (not DeFi operations)
-                instructions = tx.get("transaction", {}).get("message", {}).get("instructions", [])
-                has_parsed_transfer = False
-                for inst in instructions:
-                    parsed = inst.get("parsed", {})
-                    if parsed and parsed.get("type") == "transfer":
-                        info = parsed.get("info", {})
-                        if info.get("destination") == wallet:
-                            has_parsed_transfer = True
-                            break
-                if not has_parsed_transfer:
-                    continue
-
-                # Check for incoming SOL via pre/postBalances
-                meta = tx.get("meta", {})
-                pre_balances = meta.get("preBalances", [])
-                post_balances = meta.get("postBalances", [])
-                account_keys = [a.get("pubkey", "") if isinstance(a, dict) else str(a) for a in tx.get("transaction", {}).get("message", {}).get("accountKeys", [])]
-
-                wallet_idx = None
-                for i, key in enumerate(account_keys):
-                    if key == wallet:
-                        wallet_idx = i
-                        break
-
-                if wallet_idx is not None and wallet_idx < len(pre_balances) and wallet_idx < len(post_balances):
-                    balance_change = (post_balances[wallet_idx] - pre_balances[wallet_idx]) / 1e9
-                    if balance_change >= 0.05:  # Minimum deposit threshold
-                        block_time = tx.get("blockTime", sig_obj.get("blockTime", 0))
-                        new_deposits.append({
-                            "sig": sig,
-                            "ts": block_time or 0,
-                            "amount_sol": round(balance_change, 6),
-                            "from": "on-chain",
-                        })
-
-                time.sleep(0.5)  # Rate limit: stay under 500 CU/s with Meridian agent
-            except Exception as e:
-                print(f"[Deposits] TX fetch error for {sig[:12]}: {e}")
-                continue
-
-
-
-        # Fetch historical SOL prices — 1 yfinance call per unique date
-        dates_needed = set()
-        for dep in new_deposits:
-            dt = datetime.fromtimestamp(dep["ts"], tz=timezone.utc)
-            dates_needed.add(dt.strftime("%d-%m-%Y"))
-
-        for date_str in dates_needed:
-            fetch_sol_hourly_prices(date_str)
-            time.sleep(0.3)  # small delay between dates
-
-        # Assign prices to deposits
-        for dep in new_deposits:
-            dt = datetime.fromtimestamp(dep["ts"], tz=timezone.utc)
-            dep["sol_price"] = fetch_historical_sol_price(dt.strftime("%d-%m-%Y"), dt.hour)
-
-        # Update cache
-        cache["deposits"].extend(new_deposits)
-        if sigs:
-            cache["last_sig"] = sigs[0].get("signature", cache.get("last_sig"))
-        cache["last_fetch"] = time.time()
-
-        # Compute stats — only count manual deposits, skip RPC auto-detected
-        # (on-chain detector misclassifies position close returns as deposits)
-        deposits = [d for d in cache["deposits"] if d.get("from") != "on-chain"]
-        total_sol = sum(d.get("amount_sol", 0) for d in deposits)
-        weighted_usd = sum(
-            d.get("amount_sol", 0) * d.get("sol_price", 0)
-            for d in deposits if d.get("sol_price", 0) > 0
-        )
-        avg_price = weighted_usd / total_sol if total_sol > 0 else 0
-        with_price = sum(1 for d in deposits if d.get("sol_price", 0) > 0)
-
-        withdrawals = cache.get("withdrawals", [])
-        withdrawn_sol = sum(w.get("amount_sol", 0) for w in withdrawals)
-        withdrawn_usd = sum(w.get("amount_usd", 0) for w in withdrawals)
-
-        cache["stats"] = {
-            "total_sol": round(total_sol, 4),
-            "total_usd": round(weighted_usd, 2),
-            "avg_price": round(avg_price, 2),
-            "count": len(deposits),
-            "with_price": with_price,
-            "last_deposit_ts": deposits[-1]["ts"] if deposits else 0,
-            "withdrawn_sol": round(withdrawn_sol, 4),
-            "withdrawn_usd": round(withdrawn_usd, 2),
-        }
-
-        save_deposits_cache(cache)
-        return cache["stats"]
-    except Exception as e:
-        print(f"[Deposits] Error: {e}")
-        return cache.get("stats", {})
 
 def fmt(n, d=2):
     if n is None or n != n: return None
@@ -643,7 +333,11 @@ async def dashboard(paper: bool = Query(False)):
         wallet = state.get("owner", "") or state.get("wallet", "")
 
     # Deposit tracking — fetch from Helius if cached data is stale (live only; paper uses simulated)
-    deposit_stats = fetch_deposits() if not paper else None
+    # Deposit tracking — read from deposits.json directly (manual updates only, no RPC)
+    deposit_stats = None
+    if not paper:
+        cache = load_deposits_cache()
+        deposit_stats = cache.get("stats", {})
     
     # Update wallet if still empty (found from deposit tracking logs)
     if not wallet:
@@ -859,9 +553,9 @@ async def dashboard(paper: bool = Query(False)):
         # Paper: no deposit tracking — portfolio card hidden in UI
         deposit_stats = {}
     else:
-        dc = load_dashboard_config()
-        rpc_enabled = dc.get("wallet_rpc_enabled", False) and bool(HELIUS_API_KEY)
-        wb = fetch_wallet_rpc() if rpc_enabled else None
+        # Always fetch wallet balance via public Solana RPC (no API key needed)
+        rpc_enabled = True
+        wb = fetch_wallet_rpc()
         wallet_balance = None
         if wb:
             wallet_balance = {
@@ -918,11 +612,11 @@ async def dashboard(paper: bool = Query(False)):
         if wallet_balance and wallet_balance.get("sol"):
             current_sol = wallet_balance["sol"]
             comp_wallet_sol = wallet_balance["sol"]
-        elif ALCHEMY_API_KEY:
+        else:
+            # Fallback: fetch via public Solana RPC
             try:
-                rpc_url = f"https://solana-mainnet.g.alchemy.com/v2/{ALCHEMY_API_KEY}"
                 payload = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "getBalance", "params": [wallet]}).encode()
-                req = urllib.request.Request(rpc_url, data=payload, headers={"Content-Type": "application/json"})
+                req = urllib.request.Request("https://api.mainnet-beta.solana.com", data=payload, headers={"Content-Type": "application/json"})
                 resp = urllib.request.urlopen(req, timeout=10)
                 result = json.loads(resp.read())
                 current_sol = result.get("result", {}).get("value", 0) / 1e9
@@ -994,7 +688,7 @@ async def dashboard(paper: bool = Query(False)):
     return {
         "wallet": (wallet[:6] + "..." + wallet[-4:]) if wallet else "—",
         "wallet_full": wallet,
-        "has_helius_key": bool(HELIUS_API_KEY),
+        "has_helius_key": False,  # Deprecated — using public RPC,
         "wallet_rpc_enabled": rpc_enabled,
         "positions": active,
         "position_count": len(active),
@@ -1061,13 +755,13 @@ async def dashboard(paper: bool = Query(False)):
 async def wallet_endpoint():
     wb = fetch_wallet_rpc() or latest_wallet_balance()
     if not wb:
-        return {"available": False, "has_api_key": bool(HELIUS_API_KEY)}
-    return {"available": True, "has_api_key": bool(HELIUS_API_KEY), **wb}
+        return {"available": False, "has_api_key": False}
+    return {"available": True, "has_api_key": False, **wb}
 
 @app.get("/api/config")
 async def get_config():
     config = load_dashboard_config()
-    config["has_helius_key"] = bool(HELIUS_API_KEY)
+    config["has_helius_key"] = False  # Deprecated — using public RPC
     return config
 
 @app.patch("/api/config")
