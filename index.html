@@ -661,6 +661,55 @@ async function fetchBoth(){
   if(live)cache.live=live;
   data=cache.live;
   if(data)renderAll(data);
+  // Immediately re-apply cached live positions so PnL doesn't flicker stale
+  applyLivePositions();
+}
+
+// ═══ LIVE POSITIONS (Meteora API, 30s poll) ═══
+cache.livePos=null;
+async function fetchLivePositions(){
+  try{
+    const r=await fetch('/api/live-positions?_='+Date.now());
+    const d=await r.json();
+    if(!d.error){
+      cache.livePos=d;
+      applyLivePositions();
+    }
+  }catch(e){}
+}
+
+function applyLivePositions(){
+  const d=cache.livePos;
+  if(!d||!data?.positions)return;
+  for(const pool of (d.positions||[])){
+    const poolAddr=pool.poolAddress;
+    for(const p of data.positions){
+      if(p.pool===poolAddr){
+        p.unrealized_pnl_usd=parseFloat(pool.pnl)||0;
+        p.unrealized_pnl_pct=parseFloat(pool.pnlPctChange)||0;
+        p.unrealized_pnl_sol=parseFloat(pool.pnlSol)||0;
+        p.unclaimed_fees_usd=parseFloat(pool.unclaimedFees)||0;
+        p.unclaimed_fees_sol=parseFloat(pool.unclaimedFeesSol)||0;
+        p.total_value_usd=(parseFloat(pool.balances)||0)+(parseFloat(pool.unclaimedFees)||0);
+        p.out_of_range_since=pool.outOfRange?new Date().toISOString():null;
+      }
+    }
+  }
+  // Recalc totals
+  let totUnr=0,totUnrSol=0,totUnc=0,totUncSol=0;
+  for(const pool of (d.positions||[])){
+    totUnr+=parseFloat(pool.pnl)||0;
+    totUnrSol+=parseFloat(pool.pnlSol)||0;
+    totUnc+=parseFloat(pool.unclaimedFees)||0;
+    totUncSol+=parseFloat(pool.unclaimedFeesSol)||0;
+  }
+  data.unrealized_pnl_usd=totUnr;
+  data.unrealized_pnl_sol=totUnrSol;
+  data.unclaimed_fees_usd=totUnc;
+  data.unclaimed_fees_sol=totUncSol;
+  // Re-render
+  renderStats(data);
+  renderPositions(data.positions);
 }
 
 function renderAll(d){
@@ -1316,6 +1365,8 @@ function goPg(n){pgCur=Math.max(1,Math.min(n,Math.ceil(allH.length/pgSz)));rende
 
 fetchBoth();
 setInterval(fetchBoth,60000);
+fetchLivePositions();
+setInterval(fetchLivePositions,30000);
 
 // ═══ MOBILE NAV ═══
 const mobPages=[
