@@ -554,9 +554,9 @@ async def dashboard(paper: bool = Query(False)):
     if isinstance(raw_strategy, dict):
         config["strategy"] = raw_strategy.get("strategy", "spot")
     config_summary = dict(config)
-    config_summary["solMode"] = config.get("solMode", False)
+    config_summary["solMode"] = config.get("management", {}).get("solMode", config.get("solMode", False))
     strategy_name = config.get("strategy", "spot")
-    config_summary["strategyDetail"] = "Single-side SOL" if strategy_name == "spot" else "Dual-side"
+    config_summary["strategyDetail"] = "Single-side SOL"
 
     # Boot time for accurate uptime
     boot_time = None
