@@ -71,20 +71,19 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
 .stat-info:hover{background:var(--blue);color:#fff}
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:999;align-items:center;justify-content:center}
 .modal-overlay.open{display:flex}
-.modal-box{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:24px;min-width:400px;max-width:560px;width:90vw;font-family:var(--mono);font-size:12px;color:var(--tx)}
-.modal-box h3{margin:0 0 14px;font-size:13px;color:var(--t2);display:flex;justify-content:space-between;align-items:center}
-.modal-box .modal-close{cursor:pointer;color:var(--t4);font-size:16px;padding:2px 6px;border-radius:4px}
+.modal-box{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:16px;min-width:380px;max-width:480px;width:90vw;font-family:var(--mono);font-size:12px;color:var(--tx)}
+.modal-box h3{margin:0 0 10px;font-size:12px;color:var(--t2);display:flex;justify-content:space-between;align-items:center}
+.modal-box .modal-close{cursor:pointer;color:var(--t4);font-size:14px;padding:2px 6px;border-radius:4px}
 .modal-box .modal-close:hover{background:var(--bg4);color:var(--tx)}
-.modal-row{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-radius:4px;transition:background .1s}
-.modal-row:hover{background:var(--bg3)}
-.modal-row .mk{color:var(--t3);font-size:12px}
+.modal-row{display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:11px}
+.modal-row .mk{color:var(--t3)}
 .modal-row .mv{font-weight:600;text-align:right}
 .modal-row.mv-grn .mv{color:var(--grn)}
 .modal-row.mv-red .mv{color:var(--red)}
 .modal-row.mv-cyan .mv{color:var(--cyan)}
-.modal-sep{border-top:1px solid var(--border);margin:10px 0}
-.modal-section{margin-bottom:8px}
-.modal-section-label{font-family:var(--mono);font-size:10px;font-weight:600;color:var(--t4);text-transform:uppercase;letter-spacing:.5px;padding:4px 10px;margin-bottom:2px}
+.modal-sep{border-top:1px solid var(--border);margin:6px 0}
+.modal-section{margin-bottom:4px}
+.modal-section-label{font-family:var(--mono);font-size:9px;font-weight:600;color:var(--t4);text-transform:uppercase;letter-spacing:.5px;padding:0 0 2px;margin-bottom:0}
 .econ-head{display:flex;justify-content:space-between;align-items:center;margin:0 0 8px;gap:8px}
 .econ-head h3{font-family:var(--mono);font-size:10px;font-weight:500;color:var(--t3);text-transform:uppercase;letter-spacing:.5px}
 .econ-help-btn{font-family:var(--mono);font-size:11px;color:var(--t3);background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:4px 10px;cursor:pointer;white-space:nowrap;position:relative}
@@ -783,18 +782,18 @@ function showPortfolioModal(){
   const tokenPct=totalSol>0?(tokenUsd/solP/totalSol)*100:0;
   const rentPct=totalSol>0?(c.rent_sol/totalSol)*100:0;
 
-  let h=`<div style="margin-bottom:14px">`;
-  h+=`<div style="display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--bg4);margin-bottom:8px">`;
+  let h=`<div style="margin-bottom:10px">`;
+  h+=`<div style="display:flex;height:6px;border-radius:3px;overflow:hidden;background:var(--bg4);margin-bottom:6px">`;
   h+=`<div style="width:${walletPct}%;background:var(--blue);transition:width .3s" title="Wallet ${walletPct.toFixed(1)}%"></div>`;
   h+=`<div style="width:${posPct}%;background:var(--grn);transition:width .3s" title="Positions ${posPct.toFixed(1)}%"></div>`;
   if(tokenPct>0.5)h+=`<div style="width:${tokenPct}%;background:var(--orange);transition:width .3s" title="Tokens ${tokenPct.toFixed(1)}%"></div>`;
   if(rentPct>0.5)h+=`<div style="width:${rentPct}%;background:var(--purple);transition:width .3s" title="Rent ${rentPct.toFixed(1)}%"></div>`;
   h+=`</div>`;
-  h+=`<div style="display:flex;flex-wrap:wrap;gap:12px;font-family:var(--mono);font-size:10px;color:var(--t3)">`;
-  h+=`<span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:2px;background:var(--blue)"></span>Wallet</span>`;
-  h+=`<span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:2px;background:var(--grn)"></span>Positions</span>`;
-  if(tokenPct>0.5)h+=`<span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:2px;background:var(--orange)"></span>Tokens</span>`;
-  if(rentPct>0.5)h+=`<span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:2px;background:var(--purple)"></span>Rent</span>`;
+  h+=`<div style="display:flex;flex-wrap:wrap;gap:10px;font-family:var(--mono);font-size:9px;color:var(--t3)">`;
+  h+=`<span style="display:flex;align-items:center;gap:3px"><span style="width:6px;height:6px;border-radius:1px;background:var(--blue)"></span>Wallet</span>`;
+  h+=`<span style="display:flex;align-items:center;gap:3px"><span style="width:6px;height:6px;border-radius:1px;background:var(--grn)"></span>Positions</span>`;
+  if(tokenPct>0.5)h+=`<span style="display:flex;align-items:center;gap:3px"><span style="width:6px;height:6px;border-radius:1px;background:var(--orange)"></span>Tokens</span>`;
+  if(rentPct>0.5)h+=`<span style="display:flex;align-items:center;gap:3px"><span style="width:6px;height:6px;border-radius:1px;background:var(--purple)"></span>Rent</span>`;
   h+=`</div></div>`;
 
   // Breakdown section
@@ -808,7 +807,7 @@ function showPortfolioModal(){
   h+=`</div>`;
 
   h+=`<div class="modal-sep"></div>`;
-  h+=`<div class="modal-row" style="padding:10px"><span class="mk" style="font-weight:600;color:var(--tx)">Total</span><span class="mv" style="color:var(--tx);font-size:14px">${c.current_sol.toFixed(4)} SOL <span style="color:var(--t4);font-size:11px">($${f(c.current_usd)})</span></span></div>`;
+  h+=`<div class="modal-row" style="padding:2px 0"><span class="mk" style="font-weight:600;color:var(--tx)">Total</span><span class="mv" style="color:var(--tx);font-size:12px">${c.current_sol.toFixed(4)} SOL <span style="color:var(--t4);font-size:10px">($${f(c.current_usd)})</span></span></div>`;
 
   h+=`<div class="modal-sep"></div>`;
   h+=`<div class="modal-section"><div class="modal-section-label">Deposit Tracking</div>`;
@@ -822,7 +821,7 @@ function showPortfolioModal(){
   h+=`<div class="modal-sep"></div>`;
   const pnl=c.current_usd + (c.withdrawn_usd||0) - c.deposited_usd;
   const pnlSol=c.current_sol + (c.withdrawn_sol||0) - c.deposited_sol;
-  h+=`<div class="modal-row ${pnl>=0?'mv-grn':'mv-red'}" style="padding:10px"><span class="mk" style="font-weight:600">Portfolio PnL</span><span class="mv" style="font-size:14px">${pnl>=0?'+':''}$${f(pnl)} <span style="font-size:11px">${pnlSol>=0?'+':''}${pnlSol.toFixed(4)} ◎</span></span></div>`;
+  h+=`<div class="modal-row ${pnl>=0?'mv-grn':'mv-red'}" style="padding:2px 0"><span class="mk" style="font-weight:600">Portfolio PnL</span><span class="mv" style="font-size:12px">${pnl>=0?'+':''}$${f(pnl)} <span style="font-size:10px">${pnlSol>=0?'+':''}${pnlSol.toFixed(4)} ◎</span></span></div>`;
   $('#portfolioModalBody').innerHTML=h;
   $('#portfolioModal').classList.add('open');
 }
