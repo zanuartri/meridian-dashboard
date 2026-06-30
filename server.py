@@ -407,14 +407,37 @@ async def dashboard(paper: bool = Query(False)):
     total_unrealized_sol = 0
     total_unclaimed_fees_sol = 0
     sol_price_for_pnl = get_sol_price()
+    sol_mode = config.get("management", {}).get("solMode", False)
     for addr, pos in positions.items():
         if not isinstance(pos, dict) or pos.get("closed"): continue
         br = pos.get("bin_range", {}) or {}
+        # last_total_value_usd / last_pnl_usd / last_unclaimed_fees_usd are written by the
+        # agent's management cycle from tools/pnl.js, which (despite the "_usd" name) returns
+        # these ALREADY in SOL units when management.solMode=True. Resolve to true USD/SOL once
+        # here so every downstream consumer (positions_value, portfolio modal, etc.) can trust
+        # the field names instead of re-deriving and double-converting.
+        raw_value = pos.get("last_total_value_usd")
+        raw_pnl = pos.get("last_pnl_usd")
+        raw_fees = pos.get("last_unclaimed_fees_usd")
+        if sol_mode:
+            value_sol = raw_value
+            value_usd = raw_value * sol_price_for_pnl if (raw_value is not None and sol_price_for_pnl) else None
+            pnl_sol = raw_pnl
+            pnl_usd = raw_pnl * sol_price_for_pnl if (raw_pnl is not None and sol_price_for_pnl) else None
+            fees_sol = raw_fees
+            fees_usd = raw_fees * sol_price_for_pnl if (raw_fees is not None and sol_price_for_pnl) else None
+        else:
+            value_usd = raw_value
+            value_sol = raw_value / sol_price_for_pnl if (raw_value and sol_price_for_pnl) else None
+            pnl_usd = raw_pnl
+            pnl_sol = (value_sol - (pos.get("amount_sol", 0) or 0)) if value_sol is not None else None
+            fees_usd = raw_fees
+            fees_sol = raw_fees / sol_price_for_pnl if (raw_fees and sol_price_for_pnl) else None
         # Unclaimed fees from management cycle snapshot
-        unclaimed = pos.get("last_unclaimed_fees_usd", 0) or 0
+        unclaimed = fees_usd or 0
         total_unclaimed_fees += unclaimed
         # Unrealized PnL from management cycle snapshot
-        unrealized = pos.get("last_pnl_usd", 0) or 0
+        unrealized = pnl_usd or 0
         total_unrealized += unrealized
         active.append({
             "address": addr,
@@ -435,15 +458,14 @@ async def dashboard(paper: bool = Query(False)):
             "out_of_range_since": pos.get("out_of_range_since"),
             "trailing_active": pos.get("trailing_active", False),
             "peak_pnl_pct": fmt(pos.get("peak_pnl_pct")),
-            "unrealized_pnl_usd": fmt(pos.get("last_pnl_usd")),
+            "unrealized_pnl_usd": fmt(pnl_usd),
             "unrealized_pnl_pct": fmt(pos.get("last_pnl_pct")),
-            "unclaimed_fees_usd": fmt(pos.get("last_unclaimed_fees_usd")),
-            "total_value_usd": fmt(pos.get("last_total_value_usd")),
+            "unclaimed_fees_usd": fmt(fees_usd),
+            "total_value_usd": fmt(value_usd),
             "last_pnl_at": pos.get("last_pnl_at"),
-            # SOL = on-chain position value / live SOL price − deposited SOL (matches Meteora's SOL view)
-            "unrealized_pnl_sol": fmt((pos.get("last_total_value_usd") or 0) / sol_price_for_pnl - (pos.get("amount_sol", 0) or 0), 6) if (sol_price_for_pnl and pos.get("last_total_value_usd")) else None,
-            "unclaimed_fees_sol": fmt((pos.get("last_unclaimed_fees_usd", 0) or 0) / sol_price_for_pnl, 6) if sol_price_for_pnl else None,
-            "total_value_sol": fmt((pos.get("last_total_value_usd") or 0) / sol_price_for_pnl, 6) if (sol_price_for_pnl and pos.get("last_total_value_usd")) else pos.get("amount_sol"),
+            "unrealized_pnl_sol": fmt(pnl_sol, 6) if pnl_sol is not None else None,
+            "unclaimed_fees_sol": fmt(fees_sol, 6) if fees_sol is not None else None,
+            "total_value_sol": fmt(value_sol, 6) if value_sol is not None else pos.get("amount_sol"),
         })
     # Compute SOL unrealized totals
     for p in active:
@@ -623,13 +645,13 @@ async def dashboard(paper: bool = Query(False)):
                 wallet = wb.get("wallet", "") or wallet
 
     # Net worth = tokens holding (wallet) + open positions + rent fees.
-    # Position value: prefer last_total_value_usd (on-chain from SDK), fallback to amount_sol × sol_price
+    # active[].total_value_usd is already resolved to true USD above (solMode-aware) — use it
+    # directly instead of re-reading the raw (possibly SOL-denominated) state.json field.
     sol_price = wallet_balance.get("sol_price") if wallet_balance else 0
     positions_value = 0
     rent_sol_total = 0
     for p in active:
-        # SDK writes last_total_value_usd; total_value_usd may not exist
-        val_usd = p.get("last_total_value_usd") or p.get("total_value_usd")
+        val_usd = p.get("total_value_usd")
         if val_usd is None or val_usd == 0:
             # Fallback: use amount_sol from state.json
             amount_sol = p.get("amount_sol", 0) or 0
@@ -675,14 +697,13 @@ async def dashboard(paper: bool = Query(False)):
         # Add CURRENT value of open positions in SOL (total_value_sol reflects unrealized PnL; fallback amount_sol)
         # This avoids double-counting: wallet SOL is POST-deploy (what's left),
         # positions Sol is what was deployed INTO LP positions.
-        # Use last_total_value_usd from state.json (on-chain value) instead of amount_sol fallback.
+        # active[].total_value_sol is already resolved to true SOL above (solMode-aware) — use
+        # it directly instead of re-deriving from the raw state.json field (which double-divided
+        # by sol_price when solMode=True, since that field is already SOL-denominated there).
         for p in active:
-            # Prefer on-chain value: last_total_value_usd / sol_price (SDK writes this field)
-            pv_usd = p.get("last_total_value_usd") or p.get("total_value_usd")
-            if pv_usd and sol_price_for_pnl:
-                pv = pv_usd / sol_price_for_pnl
-            else:
-                pv = (p.get("total_value_sol") or p.get("amount_sol", 0) or 0)
+            pv = p.get("total_value_sol")
+            if pv is None:
+                pv = (p.get("amount_sol", 0) or 0)
             current_sol += pv
             comp_positions_sol += pv
         
