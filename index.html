@@ -424,8 +424,8 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
           <h3 style="display:flex;justify-content:space-between;align-items:center">
             <span>Performance Trend <span style="color:var(--t4)" id="chTag">—</span></span>
             <span style="display:flex;gap:2px">
-              <span class="term-pill on" onclick="setPerfView('usd')" id="perfUsd" style="font-size:9px;padding:2px 6px;cursor:pointer">$</span>
-              <span class="term-pill" onclick="setPerfView('sol')" id="perfSol" style="font-size:9px;padding:2px 6px;cursor:pointer">◎</span>
+              <span class="term-pill on" onclick="setPerfView('sol')" id="perfSol" style="font-size:9px;padding:2px 6px;cursor:pointer">◎</span>
+              <span class="term-pill" onclick="setPerfView('usd')" id="perfUsd" style="font-size:9px;padding:2px 6px;cursor:pointer">$</span>
               <span class="term-pill" onclick="setPerfView('both')" id="perfBoth" style="font-size:9px;padding:2px 6px;cursor:pointer">Both</span>
             </span>
           </h3>
@@ -435,8 +435,8 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
           <h3 style="display:flex;justify-content:space-between;align-items:center">
             <span>Daily PnL <span style="color:var(--t4)" id="dailyTag">—</span></span>
             <span style="display:flex;gap:2px">
-              <span class="term-pill on" onclick="setDailyView('usd')" id="dailyUsd" style="font-size:9px;padding:2px 6px;cursor:pointer">$</span>
-              <span class="term-pill" onclick="setDailyView('sol')" id="dailySol" style="font-size:9px;padding:2px 6px;cursor:pointer">◎</span>
+              <span class="term-pill on" onclick="setDailyView('sol')" id="dailySol" style="font-size:9px;padding:2px 6px;cursor:pointer">◎</span>
+              <span class="term-pill" onclick="setDailyView('usd')" id="dailyUsd" style="font-size:9px;padding:2px 6px;cursor:pointer">$</span>
             </span>
           </h3>
           <div class="chart-wrap"><canvas id="dailyChart"></canvas></div>
@@ -555,8 +555,8 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
       <div class="term-head">
         <div class="term-title"><div class="term-dot"></div><h2>Calendar</h2></div>
         <div class="term-pills">
-          <div class="term-pill on" onclick="setCalView('usd')" id="calUsd" style="font-size:10px">$</div>
-          <div class="term-pill" onclick="setCalView('sol')" id="calSol" style="font-size:10px">◎</div>
+          <div class="term-pill on" onclick="setCalView('sol')" id="calSol" style="font-size:10px">◎</div>
+          <div class="term-pill" onclick="setCalView('usd')" id="calUsd" style="font-size:10px">$</div>
           <div class="term-pill" id="calPrev">‹</div>
           <div class="term-pill" id="calMonth" style="cursor:default">—</div>
           <div class="term-pill" id="calNext">›</div>
@@ -610,7 +610,7 @@ const utcNow=()=>new Date();
 
 let allH=[],pgSz=15,pgCur=1,data=null,curPage='overview';
 let cache={live:null};
-let dailyView='usd',calView='usd',perfView='usd';
+let dailyView='sol',calView='sol',perfView='sol';
 let charts={};
 
 function setDailyView(v){
@@ -747,8 +747,8 @@ function renderStats(d){
   const portfolioSol=d.portfolio_pnl_sol;
   const portfolioTotal=d.portfolio_total_usd;
   const portfolioUsd=d.portfolio_pnl_usd;
-  const pnlColor=pnl>=0?'grn':'red';
-  const unrColor=unrealized>=0?'grn':'red';
+  const pnlColor=pnlSol>=0?'grn':'red';
+  const unrColor=unrealizedSol>=0?'grn':'red';
   const realPnlColor=realPnl>=0?'grn':'red';
   const aw=d.avg_win_usd||0, al=d.avg_loss_usd||0;
   const solPrice=d.sol_price||0;
@@ -762,8 +762,8 @@ function renderStats(d){
     : '';
   let statsHtml=`
     <div class="stat"><div class="stat-l">Open</div><div class="stat-v blue">${d.position_count}/${d.max_positions}</div><div class="stat-sub">positions</div></div>
-    <div class="stat"><div class="stat-l">Unrealized</div><div class="stat-v ${unrColor}">${usd(unrealized)}</div><div class="stat-sub">${sol(unrealizedSol)}</div></div>
-    <div class="stat"><div class="stat-l">Net PnL</div><div class="stat-v ${pnlColor}">${usd(pnl)}</div><div class="stat-sub">${sol(pnlSol)}</div></div>
+    <div class="stat"><div class="stat-l">Unrealized</div><div class="stat-v ${unrColor}">${sol(unrealizedSol)}</div><div class="stat-sub" style="color:var(--${unrealized>=0?'grn':'red'})">${usd(unrealized)}</div></div>
+    <div class="stat"><div class="stat-l">Net PnL</div><div class="stat-v ${pnlColor}">${sol(pnlSol)}</div><div class="stat-sub" style="color:var(--${pnl>=0?'grn':'red'})">${usd(pnl)}</div></div>
     ${portfolioCard}
   `;
   $('#statRow').innerHTML=statsHtml;
@@ -812,13 +812,13 @@ function renderChart(daily){
   const lastVal=cu[cu.length-1]||0;
   const lastValSol=cuSol[cuSol.length-1]||0;
   const lineColor=lastVal>=0?'#00e676':'#ff5252';
-  const lineColorSol=lastValSol>=0?'#448aff':'#ff9100';
+  const lineColorSol=lastValSol>=0?'#00e676':'#ff5252';
   const gc='#252525',tc='#666';
   const showUsd=perfView==='usd'||perfView==='both';
   const showSol=perfView==='sol'||perfView==='both';
   const datasets=[];
   if(showUsd) datasets.push({label:'USD',data:cu,borderColor:lineColor,backgroundColor:ctx=>{const g=ctx.chart.ctx.createLinearGradient(0,0,0,200);g.addColorStop(0,lineColor==='#00e676'?'rgba(0,230,118,.1)':'rgba(255,82,82,.1)');g.addColorStop(1,'rgba(0,0,0,0)');return g},fill:true,tension:.3,pointRadius:2,borderWidth:2,pointBackgroundColor:lineColor,pointBorderColor:'#141414',pointBorderWidth:1.5});
-  if(showSol) datasets.push({label:'SOL',data:cuSol,borderColor:lineColorSol,backgroundColor:showUsd?'transparent':ctx=>{const g=ctx.chart.ctx.createLinearGradient(0,0,0,200);g.addColorStop(0,lineColorSol==='#448aff'?'rgba(68,138,255,.1)':'rgba(255,145,0,.1)');g.addColorStop(1,'rgba(0,0,0,0)');return g},fill:!showUsd,tension:.3,pointRadius:2,borderWidth:2,borderDash:showUsd?[4,2]:[],pointBackgroundColor:lineColorSol,pointBorderColor:'#141414',pointBorderWidth:1.5,yAxisID:showUsd?'y1':'y'});
+  if(showSol) datasets.push({label:'SOL',data:cuSol,borderColor:lineColorSol,backgroundColor:showUsd?'transparent':ctx=>{const g=ctx.chart.ctx.createLinearGradient(0,0,0,200);g.addColorStop(0,lineColorSol==='#00e676'?'rgba(0,230,118,.1)':'rgba(255,82,82,.1)');g.addColorStop(1,'rgba(0,0,0,0)');return g},fill:!showUsd,tension:.3,pointRadius:2,borderWidth:2,borderDash:showUsd?[4,2]:[],pointBackgroundColor:lineColorSol,pointBorderColor:'#141414',pointBorderWidth:1.5,yAxisID:showUsd?'y1':'y'});
   const yFmt=showUsd&&!showSol?v=>'$'+v.toFixed(2):showSol&&!showUsd?v=>v.toFixed(4)+' SOL':v=>v.toFixed(2);
   const o={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:datasets.length>1,labels:{color:'#999',font:{family:'JetBrains Mono',size:10},boxWidth:12,padding:8}},tooltip:{backgroundColor:'#1a1a1a',titleFont:{family:'JetBrains Mono',weight:'600',size:11},bodyFont:{family:'JetBrains Mono',size:11},padding:8,borderColor:'#333',borderWidth:1,displayColors:true}},scales:{x:{grid:{color:gc,drawBorder:false},ticks:{color:tc,font:{family:'JetBrains Mono',size:10}}},y:{grid:{color:gc,drawBorder:false},ticks:{color:tc,font:{family:'JetBrains Mono',size:10},callback:yFmt}}}};
   if(showUsd&&showSol) o.scales.y1={position:'right',grid:{drawOnChartArea:false},ticks:{color:lineColorSol,font:{family:'JetBrains Mono',size:10},callback:v=>v.toFixed(4)+' SOL'}};
@@ -845,7 +845,7 @@ function renderDailyChart(daily){
   const valsSol=daily.map(x=>x.pnl_sol||0);
   const isSol=dailyView==='sol';
   const vals=isSol?valsSol:valsUsd;
-  const colors=vals.map(x=>x>=0?(isSol?'rgba(68,138,255,.6)':'rgba(0,230,118,.6)'):(isSol?'rgba(255,145,0,.5)':'rgba(255,82,82,.5)'));
+  const colors=vals.map(x=>x>=0?'rgba(0,230,118,.6)':'rgba(255,82,82,.5)');
   const gc='#252525',tc='#666';
   const yFmt=isSol?v=>v.toFixed(4)+' SOL':v=>'$'+v;
   const o={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#1a1a1a',titleFont:{family:'JetBrains Mono',weight:'600',size:11},bodyFont:{family:'JetBrains Mono',size:11},padding:8,borderColor:'#333',borderWidth:1,displayColors:false,callbacks:{label:ctx=>isSol?ctx.parsed.y.toFixed(6)+' SOL':'$'+ctx.parsed.y.toFixed(2)}}},scales:{x:{grid:{color:gc,drawBorder:false},ticks:{color:tc,font:{family:'JetBrains Mono',size:10}}},y:{grid:{color:gc,drawBorder:false},ticks:{color:tc,font:{family:'JetBrains Mono',size:10},callback:yFmt}}}};
@@ -919,9 +919,8 @@ function renderPositions(positions){
         <div class="pos-name">${p.pair}</div>
         <div class="pos-addr">${p.address}</div>
         <div class="pos-row"><span class="k">Deposited</span><span class="v">${p.amount_sol} SOL</span></div>
-        <div class="pos-row"><span class="k">Value</span><span class="v">${p.total_value_usd!=null?'$'+f(p.total_value_usd):'—'}${p.total_value_sol!=null?' ('+f(p.total_value_sol,6)+' SOL)':''}</span></div>
-        <div class="pos-row"><span class="k">Unrealized PnL</span><span class="v ${p.unrealized_pnl_usd>=0?'grn':'red'}">${p.unrealized_pnl_usd!=null?usd(p.unrealized_pnl_usd):'—'}${p.unrealized_pnl_pct!=null?` (${p.unrealized_pnl_pct>=0?'+':''}${f(p.unrealized_pnl_pct)}%)`:''}</span></div>
-        ${p.unrealized_pnl_sol!=null?`<div class="pos-row"><span class="k">PnL (SOL)</span><span class="v ${p.unrealized_pnl_sol>=0?'grn':'red'}">${sol(p.unrealized_pnl_sol)}</span></div>`:''}
+        <div class="pos-row"><span class="k">Value</span><span class="v">${p.total_value_sol!=null?f(p.total_value_sol,4)+' SOL':'—'}${p.total_value_usd!=null?' <span style="color:var(--t4)">($'+f(p.total_value_usd)+')</span>':''}</span></div>
+        <div class="pos-row"><span class="k">Unrealized PnL</span><span class="v ${(p.unrealized_pnl_sol??0)>=0?'grn':'red'}">${p.unrealized_pnl_sol!=null?sol(p.unrealized_pnl_sol):'—'}${p.unrealized_pnl_pct!=null?` (${p.unrealized_pnl_pct>=0?'+':''}${f(p.unrealized_pnl_pct)}%)`:''}${p.unrealized_pnl_usd!=null?` <span style="color:var(--t4)">${usd(p.unrealized_pnl_usd)}</span>`:''}</span></div>
         ${trail?`<div class="pos-row"><span class="k">Trailing</span><span class="v org">Peak ${p.peak_pnl_pct!=null?f(p.peak_pnl_pct)+'%':'?'}</span></div>`:''}
         <div class="pos-row"><span class="k">Unclaimed Fees</span><span class="v cyan">${p.unclaimed_fees_usd!=null?'$'+f(p.unclaimed_fees_usd,2):'—'}${p.unclaimed_fees_sol!=null?' ('+f(p.unclaimed_fees_sol,6)+' SOL)':''}</span></div>
         <div class="pos-row"><span class="k">Range</span><span class="v">${p.bins_below}d × ${p.bin_step} step = ${rangeW.toFixed(0)}%</span></div>
@@ -960,12 +959,13 @@ function renderRecentTrades(history){
   const recent=history.slice(0,5);
   $('#recentCount').textContent=history.length+' total';
   el.innerHTML=recent.map(t=>{
-    const pnl=t.pnl_usd||0,pct=t.pnl_pct||0;
+    const pnl=t.pnl_usd||0;
     const pnlSol=t.pnl_sol||0;
+    const pctSol=t.pnl_sol_pct!=null?t.pnl_sol_pct:(t.pnl_pct||0);
     const feesSol=t.fees_sol||0;
     const dt=t.recorded_at?utcDateShort(t.recorded_at):'—';
     const r=(t.close_reason||'—');const sr=r.length>20?r.slice(0,20)+'…':r;
-    return `<div class="trade-item"><div class="trade-info"><div class="trade-pair">${t.pool_name||'—'}</div><div class="trade-meta">${tm(t.minutes_held)} • ${sr} • ${dt}</div></div><div><div class="trade-pnl ${pnl>=0?'grn':'red'}">${usd(pnl)} <span style="font-size:10px;opacity:.7">${pnlSol>=0?'+':''}${pnlSol.toFixed(4)} SOL</span></div><div class="trade-pnl-sub">${pct>=0?'+':''}${f(pct)}% • fees ${f(feesSol,6)} SOL</div></div></div>`;
+    return `<div class="trade-item"><div class="trade-info"><div class="trade-pair">${t.pool_name||'—'}</div><div class="trade-meta">${tm(t.minutes_held)} • ${sr} • ${dt}</div></div><div style="text-align:right"><div class="trade-pnl ${pnlSol>=0?'grn':'red'}">${pnlSol>=0?'+':''}${pnlSol.toFixed(4)} SOL <span style="font-size:10px;opacity:.7">${pctSol>=0?'+':''}${f(pctSol)}%</span></div><div class="trade-pnl-sub">${usd(pnl)} • fees ${f(feesSol,4)} SOL</div></div></div>`;
   }).join('');
 }
 
@@ -1323,13 +1323,14 @@ function syncLearnHeights(){
 function renderTbl(){
   const s=(pgCur-1)*pgSz,e=Math.min(s+pgSz,allH.length);
   const page=allH.slice(s,e);
-  let h='<table><thead><tr><th>Pool</th><th>Size</th><th>PnL</th><th>SOL</th><th>SOL Gains (USD)</th><th>Hold</th><th>Date</th></tr></thead><tbody>';
+  let h='<table><thead><tr><th>Pool</th><th>Size</th><th>PnL (SOL)</th><th>%</th><th>Fees (SOL)</th><th>PnL (USD)</th><th>Hold</th><th>Date</th></tr></thead><tbody>';
   for(const t of page){
     const dt=t.recorded_at?utcDateShort(t.recorded_at):'—';
-    const p=t.pnl_usd||0,pct=t.pnl_pct||0;
+    const p=t.pnl_usd||0;
     const pnlSol=t.pnl_sol||0;
-    const realPnl=t.real_pnl_usd;
-    h+=`<tr><td class="pn">${t.pool_name||'—'}</td><td>${f(t.amount_sol,2)} SOL</td><td><span class="chip ${cc(p)}">${usd(p)} (${pct>=0?'+':''}${f(pct)}%)</span></td><td style="color:${pnlSol>=0?'var(--grn)':'var(--red)'};font-weight:600">${pnlSol>=0?'+':''}${pnlSol.toFixed(6)}</td><td style="color:${realPnl>=0?'var(--grn)':'var(--red)'}">${realPnl!=null?usd(realPnl):'—'}</td><td>${tm(t.minutes_held)}</td><td style="color:var(--t4)">${dt}</td></tr>`;
+    const pctSol=t.pnl_sol_pct!=null?t.pnl_sol_pct:(t.pnl_pct||0);
+    const feesSol=t.fees_sol||0;
+    h+=`<tr><td class="pn">${t.pool_name||'—'}</td><td>${f(t.amount_sol,2)} SOL</td><td><span class="chip ${cc(pnlSol)}">${pnlSol>=0?'+':''}${pnlSol.toFixed(6)} SOL</span></td><td style="color:${pctSol>=0?'var(--grn)':'var(--red)'};font-weight:600">${pctSol>=0?'+':''}${f(pctSol)}%</td><td style="color:var(--cyan)">${f(feesSol,4)}</td><td style="color:var(--t4)">${usd(p)}</td><td>${tm(t.minutes_held)}</td><td style="color:var(--t4)">${dt}</td></tr>`;
   }
   h+='</tbody></table>';
   $('#hTbl').innerHTML=h;

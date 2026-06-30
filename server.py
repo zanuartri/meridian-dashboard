@@ -317,6 +317,62 @@ def fmt(n, d=2):
     if n is None or n != n: return None
     return round(float(n), d)
 
+# ── SOL ledger (authoritative SOL PnL sourced from Meteora native fields) ──
+# Built/refreshed by update_sol_ledger.py (cron). Keyed by position address.
+_SOL_LEDGER = {"data": None, "mtime": -1}
+def load_sol_ledger():
+    """Load /root/meridian/sol-ledger.json (live only), cached by mtime."""
+    try:
+        fp = get_meridian(False) / "sol-ledger.json"
+        m = fp.stat().st_mtime
+        if _SOL_LEDGER["data"] is None or m != _SOL_LEDGER["mtime"]:
+            _SOL_LEDGER["data"] = json.loads(fp.read_text())
+            _SOL_LEDGER["mtime"] = m
+        return _SOL_LEDGER["data"]
+    except Exception:
+        return {}
+
+def pnl_sol_of(p):
+    """True realized SOL PnL for a closed trade.
+    Order: record's own native field (solMode trades) > ledger (Meteora) > derived fallback."""
+    if not isinstance(p, dict):
+        return 0
+    if p.get("pnl_sol") is not None:          # native, written by the agent at close (solMode)
+        return p["pnl_sol"]
+    e = load_sol_ledger().get(p.get("position"))
+    if isinstance(e, dict) and e.get("realized_pnl_sol") is not None:
+        return e["realized_pnl_sol"]
+    # Fallback (approximate) for trades not in ledger and predating solMode
+    return (p.get("amount_sol", 0) or 0) * ((p.get("pnl_pct", 0) or 0) / 100)
+
+def fees_sol_of(p):
+    """SOL fees for a closed trade: record's native field > ledger > derived fallback."""
+    if not isinstance(p, dict):
+        return 0
+    if p.get("fees_earned_sol") is not None:  # native, written by the agent at close
+        return p["fees_earned_sol"]
+    e = load_sol_ledger().get(p.get("position"))
+    if isinstance(e, dict) and e.get("fees_sol") is not None:
+        return e["fees_sol"]
+    _amt = p.get("amount_sol", 0) or 0
+    _iv = p.get("initial_value_usd", 0) or 0
+    _sp = _iv / _amt if _amt else 0
+    fee_usd = (p.get("fee_pnl_usd") if p.get("fee_pnl_usd") is not None else p.get("fees_earned_usd", 0)) or 0
+    return fee_usd / (_sp or 1)
+
+def pnl_sol_pct_of(p):
+    """SOL-% return for a closed trade: native field, else realized_sol / deposited_sol."""
+    if not isinstance(p, dict):
+        return None
+    if p.get("pnl_sol_pct") is not None:
+        return p["pnl_sol_pct"]
+    e = load_sol_ledger().get(p.get("position"))
+    dep = (e or {}).get("deposit_sol") if isinstance(e, dict) else None
+    dep = dep or (p.get("amount_sol") or 0)
+    ps = pnl_sol_of(p)
+    return round(ps / dep * 100, 2) if dep else None
+
+
 @app.get("/api/dashboard")
 async def dashboard(paper: bool = Query(False)):
     state = load("state.json", paper=paper)
@@ -384,9 +440,10 @@ async def dashboard(paper: bool = Query(False)):
             "unclaimed_fees_usd": fmt(pos.get("last_unclaimed_fees_usd")),
             "total_value_usd": fmt(pos.get("last_total_value_usd")),
             "last_pnl_at": pos.get("last_pnl_at"),
-            "unrealized_pnl_sol": fmt(pos.get("amount_sol", 0) * (pos.get("last_pnl_pct", 0) or 0) / 100, 6) if pos.get("last_pnl_pct") else None,
+            # SOL = on-chain position value / live SOL price − deposited SOL (matches Meteora's SOL view)
+            "unrealized_pnl_sol": fmt((pos.get("last_total_value_usd") or 0) / sol_price_for_pnl - (pos.get("amount_sol", 0) or 0), 6) if (sol_price_for_pnl and pos.get("last_total_value_usd")) else None,
             "unclaimed_fees_sol": fmt((pos.get("last_unclaimed_fees_usd", 0) or 0) / sol_price_for_pnl, 6) if sol_price_for_pnl else None,
-            "total_value_sol": fmt(pos.get("amount_sol", 0) * (1 + (pos.get("last_pnl_pct", 0) or 0) / 100), 6) if pos.get("last_pnl_pct") is not None else pos.get("amount_sol"),
+            "total_value_sol": fmt((pos.get("last_total_value_usd") or 0) / sol_price_for_pnl, 6) if (sol_price_for_pnl and pos.get("last_total_value_usd")) else pos.get("amount_sol"),
         })
     # Compute SOL unrealized totals
     for p in active:
@@ -397,8 +454,9 @@ async def dashboard(paper: bool = Query(False)):
 
     # Closed stats
     total_pnl = sum(p.get("pnl_usd", 0) for p in closed if isinstance(p, dict))
-    wins = [p for p in closed if (p.get("pnl_pct", 0) or 0) > 0]
-    losses = [p for p in closed if (p.get("pnl_pct", 0) or 0) <= 0]
+    # Win/loss classified on SOL PnL (true source of truth), not USD
+    wins = [p for p in closed if pnl_sol_of(p) > 0]
+    losses = [p for p in closed if pnl_sol_of(p) <= 0]
     win_rate = len(wins) / len(closed) * 100 if closed else 0
     avg_win = sum(p.get("pnl_pct", 0) for p in wins) / len(wins) if wins else 0
     avg_loss = sum(p.get("pnl_pct", 0) for p in losses) / len(losses) if losses else 0
@@ -406,16 +464,9 @@ async def dashboard(paper: bool = Query(False)):
         (p.get("fee_pnl_usd") if p.get("fee_pnl_usd") is not None else p.get("fees_earned_usd", 0)) or 0
         for p in closed if isinstance(p, dict)
     )
-    # SOL-denominated closed stats
-    total_pnl_sol = sum(
-        (p.get("amount_sol", 0) or 0) * ((p.get("pnl_pct", 0) or 0) / 100)
-        for p in closed if isinstance(p, dict)
-    )
-    total_fees_sol = sum(
-        ((p.get("fee_pnl_usd") if p.get("fee_pnl_usd") is not None else p.get("fees_earned_usd", 0)) or 0)
-        / (p.get("initial_value_usd", 0) / p.get("amount_sol", 1) if p.get("amount_sol") else sol_price_for_pnl or 1)
-        for p in closed if isinstance(p, dict)
-    )
+    # SOL-denominated closed stats — authoritative from Meteora ledger (not USD-derived)
+    total_pnl_sol = sum(pnl_sol_of(p) for p in closed if isinstance(p, dict))
+    total_fees_sol = sum(fees_sol_of(p) for p in closed if isinstance(p, dict))
     # Deposit tracking — real PnL accounting for SOL price changes
     total_sol_deposited = sum((p.get("amount_sol", 0) or 0) for p in closed if isinstance(p, dict))
     total_initial_usd = sum((p.get("initial_value_usd", 0) or 0) for p in closed if isinstance(p, dict))
@@ -463,13 +514,10 @@ async def dashboard(paper: bool = Query(False)):
         if day not in daily:
             daily[day] = {"date": day, "pnl_usd": 0, "pnl_sol": 0, "trades": 0, "wins": 0, "fees": 0, "fees_sol": 0}
         daily[day]["pnl_usd"] += p.get("pnl_usd", 0) or 0
-        daily[day]["pnl_sol"] += (p.get("amount_sol", 0) or 0) * ((p.get("pnl_pct", 0) or 0) / 100)
+        daily[day]["pnl_sol"] += pnl_sol_of(p)
         daily[day]["trades"] += 1
         daily[day]["fees"] += p.get("fees_earned_usd", 0) or 0
-        _deploy_sol = p.get("amount_sol", 0) or 0
-        _deploy_usd = p.get("initial_value_usd", 0) or 0
-        _sp_at_deploy = _deploy_usd / _deploy_sol if _deploy_sol else 0
-        daily[day]["fees_sol"] += (p.get("fees_earned_usd", 0) or 0) / (_sp_at_deploy or sol_price_for_pnl or 1)
+        daily[day]["fees_sol"] += fees_sol_of(p)
         if (p.get("pnl_pct", 0) or 0) > 0: daily[day]["wins"] += 1
     days = sorted(daily.values(), key=lambda x: x["date"])
     cum = 0
@@ -487,10 +535,11 @@ async def dashboard(paper: bool = Query(False)):
         if isinstance(h, dict):
             _amt = h.get("amount_sol", 0) or 0
             _pct = h.get("pnl_pct", 0) or 0
-            h["pnl_sol"] = round(_amt * _pct / 100, 6)
+            h["pnl_sol"] = round(pnl_sol_of(h), 6)
+            h["pnl_sol_pct"] = pnl_sol_pct_of(h)
             _iv = h.get("initial_value_usd", 0) or 0
             _sp = _iv / _amt if _amt else 0
-            h["fees_sol"] = round((h.get("fees_earned_usd", 0) or 0) / (_sp or sol_price_for_pnl or 1), 6)
+            h["fees_sol"] = round(fees_sol_of(h), 6)
             # Deposit SOL price tracking
             h["sol_price_at_deploy"] = round(_sp, 2) if _sp else None
             if _sp and sol_price_for_pnl:
@@ -1147,13 +1196,10 @@ async def calendar(paper: bool = Query(False)):
         if day not in daily:
             daily[day] = {"date": day, "pnl_usd": 0, "pnl_sol": 0, "trades": 0, "wins": 0, "fees": 0, "fees_sol": 0, "positions": 0}
         daily[day]["pnl_usd"] += p.get("pnl_usd", 0) or 0
-        daily[day]["pnl_sol"] += (p.get("amount_sol", 0) or 0) * ((p.get("pnl_pct", 0) or 0) / 100)
+        daily[day]["pnl_sol"] += pnl_sol_of(p)
         daily[day]["trades"] += 1
         daily[day]["fees"] += p.get("fees_earned_usd", 0) or 0
-        _ds = p.get("amount_sol", 0) or 0
-        _du = p.get("initial_value_usd", 0) or 0
-        _sp = _du / _ds if _ds else 1
-        daily[day]["fees_sol"] += (p.get("fees_earned_usd", 0) or 0) / _sp if _sp else 0
+        daily[day]["fees_sol"] += fees_sol_of(p)
         if (p.get("pnl_pct", 0) or 0) > 0: daily[day]["wins"] += 1
 
     # Count positions opened per day (from closed trades = each closed = 1 opened)
@@ -1176,9 +1222,9 @@ async def calendar(paper: bool = Query(False)):
             "pool": p.get("pool_name", "?"),
             "pnl_pct": round(pnl, 2),
             "pnl_usd": round(p.get("pnl_usd", 0) or 0, 4),
-            "pnl_sol": round((_amt := p.get("amount_sol", 0) or 0) * (pnl / 100), 6),
+            "pnl_sol": round(pnl_sol_of(p), 6),
             "fees": round(p.get("fees_earned_usd", 0) or 0, 4),
-            "fees_sol": round((p.get("fees_earned_usd", 0) or 0) / ((_du := p.get("initial_value_usd", 0) or 0) / _amt if _amt else 1), 6),
+            "fees_sol": round(fees_sol_of(p), 6),
             "held": p.get("minutes_held", 0),
             "reason": (p.get("close_reason") or "")[:60],
             "strategy": p.get("strategy", "?"),
