@@ -919,10 +919,10 @@ function renderPositions(positions){
         <div class="pos-name">${p.pair}</div>
         <div class="pos-addr">${p.address}</div>
         <div class="pos-row"><span class="k">Deposited</span><span class="v">${p.amount_sol} SOL</span></div>
-        <div class="pos-row"><span class="k">Value</span><span class="v">${p.total_value_sol!=null?f(p.total_value_sol,4)+' SOL':'—'}${p.total_value_usd!=null?' <span style="color:var(--t4)">($'+f(p.total_value_usd)+')</span>':''}</span></div>
-        <div class="pos-row"><span class="k">Unrealized PnL</span><span class="v ${(p.unrealized_pnl_sol??0)>=0?'grn':'red'}">${p.unrealized_pnl_sol!=null?sol(p.unrealized_pnl_sol):'—'}${p.unrealized_pnl_pct!=null?` (${p.unrealized_pnl_pct>=0?'+':''}${f(p.unrealized_pnl_pct)}%)`:''}${p.unrealized_pnl_usd!=null?` <span style="color:var(--t4)">${usd(p.unrealized_pnl_usd)}</span>`:''}</span></div>
+        <div class="pos-row"><span class="k">Value</span><span class="v">${p.total_value_sol!=null?f(p.total_value_sol,4)+' SOL':'—'}</span></div>
+        <div class="pos-row"><span class="k">Unrealized PnL</span><span class="v ${(p.unrealized_pnl_sol??0)>=0?'grn':'red'}">${p.unrealized_pnl_sol!=null?sol(p.unrealized_pnl_sol):'—'}${p.unrealized_pnl_pct!=null?` (${p.unrealized_pnl_pct>=0?'+':''}${f(p.unrealized_pnl_pct)}%)`:''}</span></div>
         ${trail?`<div class="pos-row"><span class="k">Trailing</span><span class="v org">Peak ${p.peak_pnl_pct!=null?f(p.peak_pnl_pct)+'%':'?'}</span></div>`:''}
-        <div class="pos-row"><span class="k">Unclaimed Fees</span><span class="v cyan">${p.unclaimed_fees_usd!=null?'$'+f(p.unclaimed_fees_usd,2):'—'}${p.unclaimed_fees_sol!=null?' ('+f(p.unclaimed_fees_sol,6)+' SOL)':''}</span></div>
+        <div class="pos-row"><span class="k">Unclaimed Fees</span><span class="v cyan">${p.unclaimed_fees_sol!=null?f(p.unclaimed_fees_sol,6)+' SOL':'—'}</span></div>
         <div class="pos-row"><span class="k">Range</span><span class="v">${p.bins_below}d × ${p.bin_step} step = ${rangeW.toFixed(0)}%</span></div>
         <div class="pos-row"><span class="k">Organic</span><span class="v">${p.organic_score||'—'}/100</span></div>
         <div class="pos-row"><span class="k">Deployed</span><span class="v">${dep}</span></div>
@@ -1076,7 +1076,7 @@ function renderCalendar(){
       const pnlUsd=dayData.pnl_usd||0;
       const pnlSol=dayData.pnl_sol||0;
       const pnl=isCalSol?pnlSol:pnlUsd;
-      const posClass=pnlUsd>0.001?'profit':pnlUsd<-0.001?'loss':'no-activity';
+      const posClass=pnl>0.001?'profit':pnl<-0.001?'loss':'no-activity';
       cls+=' '+posClass;
       const pnlStr=isCalSol?(pnlSol!==0?(pnlSol>=0?'+':'')+pnlSol.toFixed(4)+' SOL':'—'):(pnlUsd!==0?usd(pnlUsd):'—');
       h+=`<div class="${cls}" data-date="${dateStr}" title="${dateStr}: ${usd(pnlUsd)} / ${pnlSol.toFixed(4)} SOL (${dayData.trades} positions)"><div class="cal-num">${d}</div><div class="cal-center"><div class="cal-pnl">${pnlStr}</div>${dayData.trades?`<div class="cal-pos ${posClass}">${dayData.trades} positions</div>`:''}</div></div>`;
