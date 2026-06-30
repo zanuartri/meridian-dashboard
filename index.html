@@ -686,9 +686,13 @@ function applyLivePositions(){
     const poolAddr=pool.poolAddress;
     for(const p of data.positions){
       if(p.pool===poolAddr){
+        const depSol=parseFloat(p.amount_sol)||0;
+        const liveSolPnl=parseFloat(pool.pnlSol)||0;
         p.unrealized_pnl_usd=parseFloat(pool.pnl)||0;
-        p.unrealized_pnl_pct=parseFloat(pool.pnlPctChange)||0;
-        p.unrealized_pnl_sol=parseFloat(pool.pnlSol)||0;
+        // Position cards are SOL-native (see render below) — pct must be SOL-deposit-based,
+        // not Meteora's pnlPctChange (USD-based). Falls back to USD pct only if deposit unknown.
+        p.unrealized_pnl_pct=depSol>0?(liveSolPnl/depSol)*100:(parseFloat(pool.pnlPctChange)||0);
+        p.unrealized_pnl_sol=liveSolPnl;
         p.unclaimed_fees_usd=parseFloat(pool.unclaimedFees)||0;
         p.unclaimed_fees_sol=parseFloat(pool.unclaimedFeesSol)||0;
         p.total_value_usd=(parseFloat(pool.balances)||0)+(parseFloat(pool.unclaimedFees)||0);
@@ -1297,7 +1301,7 @@ async function loadLearning(){
   const accuracy=total>0?Math.round(good/total*100):0;
   $('#learnStats').innerHTML=`
     <div class="stat"><div class="stat-l">Total Trades</div><div class="stat-v">${ps.total_trades||0}</div></div>
-    <div class="stat"><div class="stat-l">Total PnL</div><div class="stat-v ${(ps.total_pnl_usd||0)>=0?'grn':'red'}">${usd(ps.total_pnl_usd)}</div></div>
+    <div class="stat"><div class="stat-l">Total PnL</div><div class="stat-v ${(ps.total_pnl_usd||0)>=0?'grn':'red'}">${usd(ps.total_pnl_usd)} <span style="font-size:10px;color:var(--t4)">${ps.total_pnl_sol!=null?(ps.total_pnl_sol>=0?'+':'')+f(ps.total_pnl_sol,4)+' ◎':''}</span></div></div>
     <div class="stat"><div class="stat-l">Avg PnL</div><div class="stat-v">${f(ps.avg_pnl_pct)}%</div></div>
     <div class="stat"><div class="stat-l">Range Efficiency</div><div class="stat-v">${f(ps.avg_range_efficiency)}%</div></div>
     <div class="stat"><div class="stat-l">Lesson Accuracy</div><div class="stat-v ${accuracy>=60?'grn':'red'}">${accuracy}%</div></div>

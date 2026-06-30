@@ -1119,6 +1119,7 @@ async def learning(paper: bool = Query(False)):
 
     # Performance breakdown
     total_pnl = sum(p.get("pnl_usd", 0) for p in perf if isinstance(p, dict))
+    total_pnl_sol = sum(pnl_sol_of(p) for p in perf if isinstance(p, dict))
     avg_pnl_pct = sum(p.get("pnl_pct", 0) for p in perf) / len(perf) if perf else 0
     avg_range_eff = sum(p.get("range_efficiency", 0) for p in perf if p.get("range_efficiency")) / max(1, len([p for p in perf if p.get("range_efficiency")]))
 
@@ -1134,6 +1135,7 @@ async def learning(paper: bool = Query(False)):
         "performance_summary": {
             "total_trades": len(perf),
             "total_pnl_usd": fmt(total_pnl),
+            "total_pnl_sol": fmt(total_pnl_sol, 4),
             "avg_pnl_pct": fmt(avg_pnl_pct),
             "avg_range_efficiency": fmt(avg_range_eff),
         }
