@@ -785,13 +785,13 @@ function showPortfolioModal(){
 
   let h=`<div style="margin-bottom:14px">`;
   h+=`<div style="display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--bg4);margin-bottom:8px">`;
-  h+=`<div style="width:${walletPct}%;background:var(--cyan);transition:width .3s" title="Wallet ${walletPct.toFixed(1)}%"></div>`;
+  h+=`<div style="width:${walletPct}%;background:var(--blue);transition:width .3s" title="Wallet ${walletPct.toFixed(1)}%"></div>`;
   h+=`<div style="width:${posPct}%;background:var(--grn);transition:width .3s" title="Positions ${posPct.toFixed(1)}%"></div>`;
   if(tokenPct>0.5)h+=`<div style="width:${tokenPct}%;background:var(--orange);transition:width .3s" title="Tokens ${tokenPct.toFixed(1)}%"></div>`;
   if(rentPct>0.5)h+=`<div style="width:${rentPct}%;background:var(--purple);transition:width .3s" title="Rent ${rentPct.toFixed(1)}%"></div>`;
   h+=`</div>`;
   h+=`<div style="display:flex;flex-wrap:wrap;gap:12px;font-family:var(--mono);font-size:10px;color:var(--t3)">`;
-  h+=`<span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:2px;background:var(--cyan)"></span>Wallet</span>`;
+  h+=`<span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:2px;background:var(--blue)"></span>Wallet</span>`;
   h+=`<span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:2px;background:var(--grn)"></span>Positions</span>`;
   if(tokenPct>0.5)h+=`<span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:2px;background:var(--orange)"></span>Tokens</span>`;
   if(rentPct>0.5)h+=`<span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:2px;background:var(--purple)"></span>Rent</span>`;
@@ -799,7 +799,7 @@ function showPortfolioModal(){
 
   // Breakdown section
   h+=`<div class="modal-section"><div class="modal-section-label">Holdings</div>`;
-  h+=`<div class="modal-row"><span class="mk">◎ Wallet</span><span class="mv" style="color:var(--cyan)">${c.wallet_sol.toFixed(4)} SOL <span style="color:var(--t4);font-size:10px">($${f(c.wallet_sol*solP)})</span></span></div>`;
+  h+=`<div class="modal-row"><span class="mk">◎ Wallet</span><span class="mv" style="color:var(--blue)">${c.wallet_sol.toFixed(4)} SOL <span style="color:var(--t4);font-size:10px">($${f(c.wallet_sol*solP)})</span></span></div>`;
   h+=`<div class="modal-row"><span class="mk">◎ In Positions</span><span class="mv" style="color:var(--grn)">${c.positions_sol.toFixed(4)} SOL <span style="color:var(--t4);font-size:10px">($${f(c.positions_sol*solP)})</span></span></div>`;
   if(tokenUsd>0){
     h+=`<div class="modal-row"><span class="mk">◎ Token Value</span><span class="mv" style="color:var(--orange)">${(tokenUsd/solP).toFixed(4)} SOL <span style="color:var(--t4);font-size:10px">($${f(tokenUsd)})</span></span></div>`;
