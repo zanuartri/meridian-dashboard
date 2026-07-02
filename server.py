@@ -11,6 +11,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 app = FastAPI(title="Meridian Dashboard")
 MERIDIAN = Path(os.environ.get("MERIDIAN_PATH", "/root/meridian"))
+PM2_LOG_DIR = Path(os.environ.get("PM2_LOG_DIR", "/root/.pm2/logs"))
 
 DASHBOARD_CONFIG = Path(__file__).parent / "dashboard-config.json"
 
@@ -456,6 +457,7 @@ async def dashboard(paper: bool = Query(False)):
             "rebalance_count": pos.get("rebalance_count", 0),
             "fees_claimed_usd": fmt(pos.get("total_fees_claimed_usd", 0)),
             "out_of_range_since": pos.get("out_of_range_since"),
+            "fee_per_tvl_24h": fmt(pos.get("fee_per_tvl_24h"), 4),
             "trailing_active": pos.get("trailing_active", False),
             "peak_pnl_pct": fmt(pos.get("peak_pnl_pct")),
             "unrealized_pnl_usd": fmt(pnl_usd),
@@ -517,6 +519,36 @@ async def dashboard(paper: bool = Query(False)):
     biggest_loss = min([p.get("pnl_usd", 0) or 0 for p in closed if isinstance(p, dict)], default=0)
     biggest_win = max([p.get("pnl_usd", 0) or 0 for p in closed if isinstance(p, dict)], default=0)
     fee_cover_pct = (fee_pnl_total / abs(inventory_pnl_total) * 100) if inventory_pnl_total < 0 else None
+
+    # Rolling-window PnL cards (Daily/Weekly/Monthly/Yearly) — UTC calendar boundaries,
+    # matching the app's existing all-UTC convention (calendar page, daily chart).
+    now_utc = datetime.now(timezone.utc)
+    today_start = now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
+    week_start = today_start - timedelta(days=today_start.weekday())  # Monday 00:00 UTC
+    month_start = today_start.replace(day=1)
+    year_start = today_start.replace(month=1, day=1)
+
+    def _window_pnl(since):
+        usd_total, sol_total, n = 0.0, 0.0, 0
+        for p in closed:
+            ts = p.get("recorded_at", "")
+            if not ts:
+                continue
+            try:
+                dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            except Exception:
+                continue
+            if dt < since:
+                continue
+            usd_total += p.get("pnl_usd", 0) or 0
+            sol_total += pnl_sol_of(p)
+            n += 1
+        return usd_total, sol_total, n
+
+    day_pnl_usd, day_pnl_sol, day_trades = _window_pnl(today_start)
+    week_pnl_usd, week_pnl_sol, week_trades = _window_pnl(week_start)
+    month_pnl_usd, month_pnl_sol, month_trades = _window_pnl(month_start)
+    year_pnl_usd, year_pnl_sol, year_trades = _window_pnl(year_start)
 
     # TP/SL stats
     tp_count = sum(1 for p in closed if "take profit" in (p.get("close_reason") or "").lower() or "trailing" in (p.get("close_reason") or "").lower())
@@ -774,6 +806,10 @@ async def dashboard(paper: bool = Query(False)):
         "unclaimed_fees_usd": fmt(total_unclaimed_fees),
         "total_fees": fmt(total_fees, 4),
         "net_pnl_sol": fmt(total_pnl_sol, 6),
+        "pnl_today_usd": fmt(day_pnl_usd), "pnl_today_sol": fmt(day_pnl_sol, 6), "pnl_today_trades": day_trades,
+        "pnl_week_usd": fmt(week_pnl_usd), "pnl_week_sol": fmt(week_pnl_sol, 6), "pnl_week_trades": week_trades,
+        "pnl_month_usd": fmt(month_pnl_usd), "pnl_month_sol": fmt(month_pnl_sol, 6), "pnl_month_trades": month_trades,
+        "pnl_year_usd": fmt(year_pnl_usd), "pnl_year_sol": fmt(year_pnl_sol, 6), "pnl_year_trades": year_trades,
         "unrealized_pnl_sol": fmt(total_unrealized_sol, 6),
         "unclaimed_fees_sol": fmt(total_unclaimed_fees_sol, 6),
         "total_fees_sol": fmt(total_fees_sol, 6),
@@ -1161,6 +1197,189 @@ async def learning(paper: bool = Query(False)):
             "avg_range_efficiency": fmt(avg_range_eff),
         }
     }
+
+@app.get("/api/export/csv")
+async def export_csv(paper: bool = Query(False)):
+    """Full closed-trade export for offline analysis — every field on the record,
+    including signal_snapshot.* and bin_range.* flattened. Not capped at 50 like
+    /api/dashboard's `history` — this is the complete performance history."""
+    import csv, io
+
+    lessons = load("lessons.json", paper=paper)
+    perf = lessons.get("performance", []) if isinstance(lessons, dict) else []
+    rows = [p for p in perf if isinstance(p, dict)]
+
+    CORE_COLS = [
+        "position", "pool", "pool_name", "base_mint", "strategy",
+        "bin_step", "amount_sol", "recorded_at", "minutes_held", "minutes_in_range",
+        "range_efficiency", "close_reason",
+        "initial_value_usd", "initial_value_sol", "final_value_usd", "final_value_sol",
+        "fees_earned_usd", "fees_earned_sol", "fee_pnl_usd", "inventory_pnl_usd",
+        "pnl_usd", "pnl_pct", "pnl_sol", "pnl_sol_pct",
+        "entry_mcap", "entry_tvl", "entry_volume", "entry_holders",
+        "exit_mcap", "exit_tvl", "exit_volume",
+        "organic_score", "volatility", "fee_tvl_ratio",
+    ]
+
+    flat_rows = []
+    extra_cols = set()
+    for p in rows:
+        flat = {}
+        for k, v in p.items():
+            if k == "signal_snapshot" and isinstance(v, dict):
+                for sk, sv in v.items():
+                    fk = f"signal_{sk}"
+                    flat[fk] = sv
+                    if fk not in CORE_COLS:
+                        extra_cols.add(fk)
+            elif k == "bin_range" and isinstance(v, dict):
+                for bk, bv in v.items():
+                    fk = f"bin_{bk}"
+                    flat[fk] = bv
+                    if fk not in CORE_COLS:
+                        extra_cols.add(fk)
+            elif isinstance(v, (dict, list)):
+                continue  # skip other nested structures — nothing else expected
+            else:
+                flat[k] = v
+                if k not in CORE_COLS:
+                    extra_cols.add(k)
+        flat_rows.append(flat)
+
+    fieldnames = CORE_COLS + sorted(extra_cols)
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=fieldnames, extrasaction="ignore")
+    writer.writeheader()
+    for r in flat_rows:
+        writer.writerow(r)
+
+    fname = f"meridian-trades-{datetime.now(timezone.utc).strftime('%Y%m%d')}.csv"
+    return Response(
+        content=buf.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
+
+
+@app.get("/api/pools")
+async def pools_endpoint(paper: bool = Query(False), page: int = Query(1), page_size: int = Query(20)):
+    """Per-pool aggregation of closed trades: trades, win rate, fees, PnL — ordered by
+    most-recently-closed trade so a pool climbs back to the top the moment a new
+    position in it closes."""
+    lessons = load("lessons.json", paper=paper)
+    perf = lessons.get("performance", []) if isinstance(lessons, dict) else []
+    rows = [p for p in perf if isinstance(p, dict) and p.get("pool")]
+
+    groups = {}
+    for p in rows:
+        addr = p["pool"]
+        g = groups.setdefault(addr, {"pool": addr, "pool_name": p.get("pool_name") or "?", "trades": []})
+        g["trades"].append(p)
+        if p.get("pool_name"):
+            g["pool_name"] = p["pool_name"]  # last-seen wins (most recent name)
+
+    pools = []
+    for addr, g in groups.items():
+        trades = g["trades"]
+        wins = sum(1 for p in trades if pnl_sol_of(p) > 0)
+        total_pnl_sol = sum(pnl_sol_of(p) for p in trades)
+        total_pnl_usd = sum(p.get("pnl_usd", 0) or 0 for p in trades)
+        total_fees_sol = sum(fees_sol_of(p) for p in trades)
+        total_fees_usd = sum(
+            (p.get("fee_pnl_usd") if p.get("fee_pnl_usd") is not None else p.get("fees_earned_usd", 0)) or 0
+            for p in trades
+        )
+        last_closed = max((p.get("recorded_at") or "" for p in trades), default="")
+        pools.append({
+            "pool": addr,
+            "pool_name": g["pool_name"],
+            "trades": len(trades),
+            "wins": wins,
+            "win_rate": fmt(wins / len(trades) * 100, 1) if trades else 0,
+            "total_fees_sol": fmt(total_fees_sol, 6),
+            "total_fees_usd": fmt(total_fees_usd),
+            "total_pnl_sol": fmt(total_pnl_sol, 6),
+            "total_pnl_usd": fmt(total_pnl_usd),
+            "last_closed_at": last_closed,
+        })
+
+    pools.sort(key=lambda x: x["last_closed_at"], reverse=True)
+
+    total = len(pools)
+    pages = max(1, (total + page_size - 1) // page_size)
+    page = max(1, min(page, pages))
+    s = (page - 1) * page_size
+    page_items = pools[s:s + page_size]
+
+    return {"pools": page_items, "total": total, "page": page, "pages": pages, "page_size": page_size}
+
+
+# ─── Logs (error/warn tail, 10-min cache) ────────────────────────
+_logs_cache = {"data": None, "ts": 0}
+_LOG_NOISE_RE_PARTS = [r"429 Too Many Requests"]
+_LOG_WARN_TAGS = ["[cron_warn]", "Suspect PnL", "suspicious"]
+
+def _parse_local_ts(line):
+    """Both meridian-out.log and meridian-error.log prefix lines with a local
+    ISO-ish timestamp up to the first ': '."""
+    try:
+        ts_str = line.split(": ", 1)[0].strip()
+        return datetime.fromisoformat(ts_str)
+    except Exception:
+        return None
+
+def _tail_lines(fp, max_lines=2000):
+    if not fp.exists():
+        return []
+    try:
+        from collections import deque
+        with open(fp, "r", errors="ignore") as f:
+            return list(deque(f, maxlen=max_lines))
+    except Exception:
+        return []
+
+@app.get("/api/logs")
+async def logs_endpoint():
+    import time as _time
+    now = _time.time()
+    if _logs_cache["data"] is not None and now - _logs_cache["ts"] < 600:
+        return _logs_cache["data"]
+
+    import re
+    noise_re = re.compile("|".join(_LOG_NOISE_RE_PARTS), re.IGNORECASE)
+    cutoff = datetime.now() - timedelta(hours=6)  # local time, matches log timestamp prefix
+
+    entries = []
+    for line in _tail_lines(PM2_LOG_DIR / "meridian-error.log"):
+        line = line.rstrip("\n")
+        if not line or noise_re.search(line):
+            continue
+        ts = _parse_local_ts(line)
+        if ts is None or ts < cutoff:
+            continue
+        entries.append({"ts": ts.isoformat(), "level": "error", "source": "error.log", "text": line})
+
+    for line in _tail_lines(PM2_LOG_DIR / "meridian-out.log"):
+        line = line.rstrip("\n")
+        if not line or not any(tag in line for tag in _LOG_WARN_TAGS):
+            continue
+        ts = _parse_local_ts(line)
+        if ts is None or ts < cutoff:
+            continue
+        entries.append({"ts": ts.isoformat(), "level": "warn", "source": "out.log", "text": line})
+
+    entries.sort(key=lambda x: x["ts"], reverse=True)
+    entries = entries[:200]
+
+    result = {
+        "logs": entries,
+        "window_hours": 6,
+        "fetched_at": datetime.now(timezone.utc).isoformat(),
+    }
+    _logs_cache["data"] = result
+    _logs_cache["ts"] = now
+    return result
+
 
 # Default password — stored in dashboard-config.json
 DASHBOARD_PASSWORD = cfg.get("password", "meridian")  # CHANGE THIS after first login

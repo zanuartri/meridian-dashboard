@@ -7,6 +7,7 @@
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <style>
 :root{
   --bg:#0d0d0d;--bg2:#141414;--bg3:#1a1a1a;--bg4:#222;
@@ -82,6 +83,12 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
 .modal-row.mv-red .mv{color:var(--red)}
 .modal-row.mv-cyan .mv{color:var(--cyan)}
 .modal-sep{border-top:1px solid var(--border);margin:6px 0}
+.modal-hero{margin:0 0 12px;padding:12px 14px;border-radius:var(--r);border:1px solid var(--border)}
+.modal-hero.grn{background:var(--grn-bg);border-color:rgba(0,230,118,.25)}.modal-hero.red{background:var(--red-bg);border-color:rgba(255,82,82,.25)}
+.modal-hero-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.modal-hero-pool{font-family:var(--mono);font-size:15px;font-weight:700;color:var(--tx)}
+.modal-hero-pnl{font-family:var(--mono);font-size:20px;font-weight:700}
+.modal-hero-sub{font-family:var(--mono);font-size:10px;color:var(--t3)}
 .modal-section{margin-bottom:4px}
 .modal-section-label{font-family:var(--mono);font-size:9px;font-weight:600;color:var(--t4);text-transform:uppercase;letter-spacing:.5px;padding:0 0 2px;margin-bottom:0}
 .econ-head{display:flex;justify-content:space-between;align-items:center;margin:0 0 8px;gap:8px}
@@ -171,7 +178,22 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
 .cal-pos-fee{font-family:var(--mono);font-size:10px;color:var(--t3)}
 .cal-pos-empty{font-family:var(--mono);font-size:11px;color:var(--t4);padding:16px;text-align:center;border:1px dashed var(--border);border-radius:var(--r)}
 
-@media(max-width:900px){.cal-day{min-height:56px;padding:4px 6px}.cal-day .cal-num{font-size:10px}.cal-day .cal-pnl{font-size:10px}.cal-day .cal-pos{font-size:9px}}
+/* ═══ CALENDAR WEEKLY SIDE COLUMN ═══ */
+.cal-wrap{display:flex;gap:8px;margin-bottom:12px;align-items:flex-start}
+.cal-wrap .cal-grid{flex:1;margin-bottom:0}
+.cal-week-col{width:120px;display:flex;flex-direction:column;gap:4px;flex-shrink:0}
+.cal-week-head{font-family:var(--mono);font-size:10px;font-weight:600;color:var(--t4);text-align:center;padding:4px 0;text-transform:uppercase}
+.cal-week-cell{border:1px solid var(--border);background:var(--bg2);border-radius:4px;min-height:90px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--mono);gap:2px;padding:6px;text-align:center}
+.cal-week-cell.empty{background:var(--bg);opacity:.4}
+.cal-week-cell.profit{background:rgba(0,230,118,.1);border-left:3px solid var(--grn)}
+.cal-week-cell.loss{background:rgba(255,82,82,.1);border-left:3px solid var(--red)}
+.cal-week-cell .cwc-pnl{font-size:13px;font-weight:700}
+.cal-week-cell .cwc-pnl.grn{color:var(--grn)}
+.cal-week-cell .cwc-pnl.red{color:var(--red)}
+.cal-week-cell .cwc-lbl{font-size:9px;color:var(--t4);text-transform:uppercase}
+.cal-week-cell .cwc-trades{font-size:10px;color:var(--t3)}
+
+@media(max-width:900px){.cal-day{min-height:56px;padding:4px 6px}.cal-day .cal-num{font-size:10px}.cal-day .cal-pnl{font-size:10px}.cal-day .cal-pos{font-size:9px}.cal-week-col{display:none}}
 
 /* ═══ SETTINGS GRID ═══ */
 .settings-grid{column-count:3;column-gap:12px}
@@ -264,6 +286,51 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
 .learn-outcome.good{background:var(--grn-bg);color:var(--grn)}
 .learn-outcome.poor{background:var(--red-bg);color:var(--red)}
 .learn-outcome.neutral{background:var(--bg4);color:var(--t3)}
+
+/* ═══ SHARE CARD ═══ */
+.share-card{width:640px;padding:36px;background:linear-gradient(160deg,#141414,#0d0d0d);border:1px solid var(--border);font-family:var(--mono);color:var(--tx)}
+.share-card .sc-brand{display:flex;align-items:center;gap:8px;margin-bottom:24px}
+.share-card .sc-brand .sc-dot{width:8px;height:8px;border-radius:50%;background:var(--grn);flex-shrink:0}
+.share-card .sc-brand b{font-size:14px;letter-spacing:2px;color:var(--grn);text-transform:uppercase}
+.share-card .sc-brand span{font-size:10px;color:var(--t3);margin-left:auto}
+.share-card .sc-period{font-size:13px;color:var(--t3);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+.share-card .sc-pnl{font-size:44px;font-weight:800;line-height:1}
+.share-card .sc-pnl-sub{font-size:15px;color:var(--t3);margin-top:8px}
+.share-card .sc-stats{display:flex;gap:28px;margin-top:28px;padding-top:20px;border-top:1px solid var(--border)}
+.share-card .sc-stat-l{font-size:10px;color:var(--t4);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.share-card .sc-stat-v{font-size:18px;font-weight:700}
+.share-card .sc-ft{margin-top:24px;font-size:9px;color:var(--t4);text-align:center}
+
+/* ═══ MINI DATE PICKER (custom, matches app theme) ═══ */
+.mini-dp{position:relative;display:inline-block}
+.mini-dp-btn{font-family:var(--mono);font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--tx);padding:4px 10px;cursor:pointer;transition:border-color .1s}
+.mini-dp-btn:hover{border-color:var(--border2)}
+.mini-dp-panel{display:none;position:absolute;top:calc(100% + 6px);left:0;background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:10px;z-index:200;width:210px;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+.mini-dp-panel.open{display:block}
+.mini-dp-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-family:var(--mono);font-size:11px;color:var(--t2)}
+.mini-dp-nav{cursor:pointer;color:var(--t3);padding:2px 8px;border-radius:3px;user-select:none}
+.mini-dp-nav:hover{color:var(--tx);background:var(--bg3)}
+.mini-dp-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.mini-dp-dow{font-size:9px;color:var(--t4);text-align:center;padding:2px 0;font-family:var(--mono)}
+.mini-dp-day{font-size:10px;text-align:center;padding:5px 0;border-radius:3px;cursor:pointer;color:var(--t2);font-family:var(--mono);position:relative}
+.mini-dp-day:hover{background:var(--bg3);color:var(--tx)}
+.mini-dp-day.sel{background:var(--grn);color:#0d0d0d;font-weight:700}
+.mini-dp-day.has-data:not(.sel)::after{content:'';position:absolute;bottom:1px;left:50%;transform:translateX(-50%);width:3px;height:3px;border-radius:50%;background:var(--cyan)}
+.mini-dp-day.empty{visibility:hidden;cursor:default}
+/* The page-level .term-pills sets overflow-x:auto on mobile for horizontal-scroll nav
+   rows — that clips this modal's absolutely-positioned dropdown panel. Override it here
+   at every breakpoint since this row is inside a modal, not the scrolling page header. */
+#shareModal .term-pills{overflow:visible}
+
+/* ═══ LOGS ═══ */
+.log-list{display:flex;flex-direction:column;gap:4px}
+.log-item{display:flex;gap:8px;align-items:flex-start;padding:8px 10px;background:var(--bg3);border-radius:4px;border:1px solid var(--border);font-family:var(--mono);font-size:11px}
+.log-lvl{flex-shrink:0;font-size:9px;font-weight:700;padding:1px 6px;border-radius:3px;text-transform:uppercase;margin-top:1px}
+.log-lvl.error{background:var(--red-bg);color:var(--red)}
+.log-lvl.warn{background:var(--orange-bg);color:var(--orange)}
+.log-ts{flex-shrink:0;color:var(--t4);font-size:10px;margin-top:2px;white-space:nowrap}
+.log-text{color:var(--t2);word-break:break-word;line-height:1.4}
+.log-empty{font-family:var(--mono);font-size:12px;color:var(--t4);padding:32px;text-align:center;border:1px dashed var(--border);border-radius:var(--r)}
 
 /* ═══ FOOTER ═══ */
 .ft{text-align:center;padding:16px;font-family:var(--mono);font-size:11px;color:var(--t4)}
@@ -371,6 +438,10 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
         Positions
       </div>
+      <div class="nav-i" data-page="pools">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+        Pools
+      </div>
       <div class="nav-i" data-page="candidates">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         Candidates
@@ -390,6 +461,10 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
       <div class="nav-i" data-page="learning">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>
         Learning
+      </div>
+      <div class="nav-i" data-page="logs">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="6" y1="9" x2="10" y2="9"/><line x1="6" y1="13" x2="14" y2="13"/></svg>
+        Logs
       </div>
       <div class="nav-i" data-page="config">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
@@ -482,6 +557,18 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
       <div class="pos-grid" id="posGrid"></div>
     </div>
 
+    <!-- ═══ POOLS (aggregated per-pool history) ═══ -->
+    <div class="page" id="pg-pools">
+      <div class="term-head">
+        <div class="term-title"><div class="term-dot"></div><h2>Pools</h2></div>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--t4)" id="poolsCount">—</span>
+      </div>
+      <div class="tbl-box">
+        <div class="tbl-scroll" id="poolsTbl"></div>
+        <div class="pg" id="poolsPg"></div>
+      </div>
+    </div>
+
     <!-- ═══ CANDIDATES (Pool Candidates) ═══ -->
     <div class="page" id="pg-candidates">
       <div class="term-head">
@@ -516,7 +603,10 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
     <div class="page" id="pg-history">
       <div class="term-head">
         <div class="term-title"><div class="term-dot"></div><h2>Trade History</h2></div>
-        <span style="font-family:var(--mono);font-size:10px;color:var(--t4)" id="hCount">—</span>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-family:var(--mono);font-size:10px;color:var(--t4)" id="hCount">—</span>
+          <a class="pos-btn" href="/api/export/csv" download style="text-decoration:none">⬇ Export CSV</a>
+        </div>
       </div>
       <div class="tbl-box">
         <div class="tbl-scroll" id="hTbl"></div>
@@ -561,16 +651,29 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
           <div class="term-pill" id="calPrev">‹</div>
           <div class="term-pill" id="calMonth" style="cursor:default">—</div>
           <div class="term-pill" id="calNext">›</div>
+          <div class="term-pill" onclick="shareCalendarImage()" id="calShare">📤 Share</div>
         </div>
       </div>
       <div class="stats" id="calStats" style="margin-bottom:12px;grid-template-columns:repeat(4,1fr)"></div>
-      <div class="cal-grid" id="calGrid"></div>
+      <div class="cal-wrap">
+        <div class="cal-grid" id="calGrid"></div>
+        <div class="cal-week-col" id="calWeekCol"></div>
+      </div>
       <div class="cal-legend">
         <span><div class="cal-dot" style="background:var(--grn)"></div>Profit</span>
         <span><div class="cal-dot" style="background:var(--red)"></div>Loss</span>
         <span><div class="cal-dot" style="background:var(--bg4)"></div>No Activity</span>
       </div>
       <div class="cal-positions" id="calPositions"></div>
+    </div>
+
+    <!-- ═══ LOGS ═══ -->
+    <div class="page" id="pg-logs">
+      <div class="term-head">
+        <div class="term-title"><div class="term-dot"></div><h2>Logs</h2></div>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--t4)" id="logsMeta">—</span>
+      </div>
+      <div class="log-list" id="logsList"></div>
     </div>
 
     <!-- ═══ SETTINGS ═══ -->
@@ -635,7 +738,7 @@ function setPerfView(v){
   if(data&&data.daily)renderChart(data.daily);
 }
 
-async function fj(p){try{const url=p+'?_='+Date.now();return(await fetch(url)).json()}catch{return null}}
+async function fj(p){try{const url=p+(p.includes('?')?'&':'?')+'_='+Date.now();return(await fetch(url)).json()}catch{return null}}
 
 
 
@@ -648,10 +751,12 @@ $$('.nav-i').forEach(el=>{
     $$('.page').forEach(p=>p.classList.remove('active'));
     document.getElementById('pg-'+pg).classList.add('active');
     curPage=pg;
+    if(pg==='pools')loadPools();
     if(pg==='candidates')loadPoolCandidates();
     if(pg==='activity')loadCandidates();
     if(pg==='learning')loadLearning();
     if(pg==='calendar')loadCalendar();
+    if(pg==='logs')loadLogs();
   });
 });
 
@@ -949,6 +1054,8 @@ function renderPositions(positions){
     const rangeW=(p.bins_below||0)*(p.bin_step||100)/100;
     const oor=!!p.out_of_range_since;
     const trail=p.trailing_active;
+    const oorDur=oor?tm((Date.now()-new Date(p.out_of_range_since).getTime())/60000):null;
+    const yieldPct=p.fee_per_tvl_24h;
     return `<div class="pos-card">
       <div class="pos-status ${oor?'down':'neutral'}"><span class="dir">${oor?'OOR':'IN RANGE'}${trail?' 🔻Trail':''}</span><span class="held">${hold}</span></div>
       <div class="pos-body">
@@ -959,6 +1066,8 @@ function renderPositions(positions){
         <div class="pos-row"><span class="k">Unrealized PnL</span><span class="v ${(p.unrealized_pnl_sol??0)>=0?'grn':'red'}">${p.unrealized_pnl_sol!=null?sol(p.unrealized_pnl_sol):'—'}${p.unrealized_pnl_pct!=null?` (${p.unrealized_pnl_pct>=0?'+':''}${f(p.unrealized_pnl_pct)}%)`:''}</span></div>
         ${trail?`<div class="pos-row"><span class="k">Trailing</span><span class="v org">Peak ${p.peak_pnl_pct!=null?f(p.peak_pnl_pct)+'%':'?'}</span></div>`:''}
         <div class="pos-row"><span class="k">Unclaimed Fees</span><span class="v cyan">${p.unclaimed_fees_sol!=null?f(p.unclaimed_fees_sol,6)+' SOL':'—'}</span></div>
+        <div class="pos-row"><span class="k">Yield (fee/TVL 24h)</span><span class="v">${yieldPct!=null?f(yieldPct)+'%':'—'}</span></div>
+        ${oor?`<div class="pos-row"><span class="k">OOR Duration</span><span class="v red">${oorDur}</span></div>`:''}
         <div class="pos-row"><span class="k">Range</span><span class="v">${p.bins_below}d × ${p.bin_step} step = ${rangeW.toFixed(0)}%</span></div>
         <div class="pos-row"><span class="k">Organic</span><span class="v">${p.organic_score||'—'}/100</span></div>
         <div class="pos-row"><span class="k">Deployed</span><span class="v">${dep}</span></div>
@@ -1072,35 +1181,40 @@ function renderCalendar(){
   const totalDays=last.getDate();
   const today=new Date();
   const todayStr=utcToday();
-  // Monthly stats
-  let monthPnl=0,monthTrades=0,monthWins=0,monthDays=0;
-  let monthPnlSol=0;
+  // Monthly stats (for the currently VIEWED month)
+  let monthTrades=0,monthWins=0,monthDays=0;
+  let monthPnlSol=0,monthPnlUsd=0;
   for(let d=1;d<=totalDays;d++){
     const ds=`${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const dd=calDaily[ds];
     if(dd){
-      monthPnl+=dd.pnl_usd||0;
-      monthPnlSol+=dd.pnl_sol||0;
       monthTrades+=dd.trades||0;
       monthWins+=dd.wins||0;
       monthDays++;
+      monthPnlSol+=dd.pnl_sol||0;
+      monthPnlUsd+=dd.pnl_usd||0;
     }
   }
   const winRate=monthTrades>0?Math.round(monthWins/monthTrades*100):0;
   const isCalSol=calView==='sol';
-  const calMonthPnl=isCalSol?monthPnlSol:monthPnl;
-  const calMonthLabel=isCalSol?(monthPnlSol>=0?'+':'')+monthPnlSol.toFixed(4)+' SOL':usd(monthPnl);
+  const monthPnlLabel=isCalSol?(monthPnlSol>=0?'+':'')+monthPnlSol.toFixed(4)+' SOL':usd(monthPnlUsd);
+
   $('#calStats').innerHTML=`
-    <div class="stat"><div class="stat-l">Month PnL</div><div class="stat-v ${calMonthPnl>=0?'grn':'red'}">${calMonthLabel}</div></div>
+    <div class="stat"><div class="stat-l">Monthly PnL</div><div class="stat-v ${monthPnlSol>=0?'grn':'red'}">${monthPnlLabel}</div></div>
     <div class="stat"><div class="stat-l">Trades</div><div class="stat-v">${monthTrades}</div></div>
     <div class="stat"><div class="stat-l">Win Rate</div><div class="stat-v">${winRate}%</div></div>
     <div class="stat"><div class="stat-l">Active Days</div><div class="stat-v">${monthDays}</div></div>
   `;
   let h=days.map(d=>`<div class="cal-head">${d}</div>`).join('');
-  for(let i=0;i<startDay;i++) h+='<div class="cal-day empty"></div>';
+  const cells=[];
+  for(let i=0;i<startDay;i++) cells.push(null);
   for(let d=1;d<=totalDays;d++){
     const dateStr=`${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const dayData=calDaily[dateStr];
+    cells.push({d,dateStr,dayData:calDaily[dateStr]});
+  }
+  for(const c of cells){
+    if(!c){h+='<div class="cal-day empty"></div>';continue;}
+    const {d,dateStr,dayData}=c;
     const isToday=dateStr===todayStr;
     const isSelected=dateStr===calSelDate;
     let cls='cal-day';
@@ -1126,6 +1240,231 @@ function renderCalendar(){
       renderCalPositions();
     });
   });
+
+  // Weekly side column — aligned to the grid's actual rows (including partial
+  // leading/trailing rows), not ISO Mon-Sun weeks that could span two months.
+  let wh=`<div class="cal-week-head">Weekly</div>`;
+  for(let i=0;i<cells.length;i+=7){
+    const rowCells=cells.slice(i,i+7).filter(Boolean);
+    if(!rowCells.length){wh+='<div class="cal-week-cell empty"></div>';continue;}
+    let pnlUsd=0,pnlSol=0,trades=0,hasData=false;
+    for(const c of rowCells){
+      if(!c.dayData)continue;
+      hasData=true;
+      pnlUsd+=c.dayData.pnl_usd||0;
+      pnlSol+=c.dayData.pnl_sol||0;
+      trades+=c.dayData.trades||0;
+    }
+    if(!hasData){wh+='<div class="cal-week-cell"><span class="cwc-lbl">No data</span></div>';continue;}
+    const pnl=isCalSol?pnlSol:pnlUsd;
+    const pnlStr=isCalSol?(pnlSol>=0?'+':'')+pnlSol.toFixed(4)+' SOL':usd(pnlUsd);
+    const wkClass=pnl>0.001?'profit':pnl<-0.001?'loss':'';
+    wh+=`<div class="cal-week-cell ${wkClass}"><div class="cwc-pnl ${pnl>=0?'grn':'red'}">${pnlStr}</div><div class="cwc-trades">${trades} positions</div></div>`;
+  }
+  $('#calWeekCol').innerHTML=wh;
+
+  // Monthly is tied to the viewed calendar month. Daily/Weekly are computed on-demand
+  // in the share modal from `calDaily` (see computeDayStats/computeWeekStats below) so
+  // the date picker and live period switching don't require re-fetching.
+  _lastCalStats={
+    monthly:{
+      periodLabel:months[calMonth]+' '+calYear,
+      pnlSol:monthPnlSol,pnlUsd:monthPnlUsd,
+      trades:monthTrades,winRate,extra:monthDays+' active days',
+    },
+  };
+}
+let _lastCalStats=null;
+let _shareBlob=null,_shareFname=null;
+let _sharePeriod='monthly';
+let _shareDate=utcToday();
+let _shareShowUsd=true;
+
+const SHARE_TAGLINES_WIN=[
+  'fees > vibes — the range paid off',
+  'LPing rewarded this time',
+  'another cycle, another basis point',
+  'the range held, the fees flowed',
+];
+const SHARE_TAGLINES_LOSS=[
+  'the price of providing liquidity',
+  'inventory bleed happens — still ranging',
+  'down this cycle, still farming fees',
+  'LPs know the risk going in',
+];
+
+function computeDayStats(dateStr){
+  const dd=calDaily[dateStr];
+  const trades=dd?.trades||0;
+  const wins=dd?.wins||0;
+  return {
+    periodLabel:dateStr,
+    pnlSol:dd?.pnl_sol||0,pnlUsd:dd?.pnl_usd||0,
+    trades,winRate:trades>0?Math.round(wins/trades*100):null,
+    extra:null, // single day — "active days" doesn't apply, hidden in the card
+  };
+}
+function computeWeekStats(){
+  // ISO week (Mon-Sun UTC) to date, matching the backend's pnl_week_* boundary.
+  const now=new Date();
+  const day=now.getUTCDay();
+  const diffToMonday=(day===0?6:day-1);
+  const monday=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate()-diffToMonday));
+  let pnlSol=0,pnlUsd=0,trades=0,wins=0,days=0;
+  for(let i=0;i<7;i++){
+    const d=new Date(monday);d.setUTCDate(monday.getUTCDate()+i);
+    if(d>now)break;
+    const ds=d.toISOString().slice(0,10);
+    const dd=calDaily[ds];
+    if(dd){pnlSol+=dd.pnl_sol||0;pnlUsd+=dd.pnl_usd||0;trades+=dd.trades||0;wins+=dd.wins||0;days++;}
+  }
+  return {
+    periodLabel:'This Week',
+    pnlSol,pnlUsd,trades,
+    winRate:trades>0?Math.round(wins/trades*100):null,
+    extra:days+' active days',
+  };
+}
+function getShareStats(){
+  if(_sharePeriod==='daily')return computeDayStats(_shareDate);
+  if(_sharePeriod==='weekly')return computeWeekStats();
+  return _lastCalStats?.monthly;
+}
+
+function setSharePeriod(period){
+  _sharePeriod=period;
+  $$('#shareModal [data-period]').forEach(el=>el.classList.toggle('on',el.dataset.period===period));
+  $('#shareDatePicker').style.display=period==='daily'?'':'none';
+  $('#miniDpPanel').classList.remove('open');
+  renderShareCard();
+}
+
+// ═══ Custom mini date picker (share modal, Daily period) ═══
+let _dpMonth=0,_dpYear=utcNow().getFullYear();
+function toggleMiniDp(e){
+  if(e)e.stopPropagation();
+  const open=!$('#miniDpPanel').classList.contains('open');
+  $('#miniDpPanel').classList.toggle('open',open);
+  if(open){
+    const d=new Date(_shareDate+'T12:00:00');
+    _dpMonth=d.getMonth();_dpYear=d.getFullYear();
+    renderMiniDp();
+  }
+}
+function miniDpNav(delta){
+  _dpMonth+=delta;
+  if(_dpMonth<0){_dpMonth=11;_dpYear--;}
+  if(_dpMonth>11){_dpMonth=0;_dpYear++;}
+  renderMiniDp();
+}
+function renderMiniDp(){
+  const monthsShort=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  $('#miniDpLabel').textContent=monthsShort[_dpMonth]+' '+_dpYear;
+  const dows=['S','M','T','W','T','F','S'];
+  let h=dows.map(d=>`<div class="mini-dp-dow">${d}</div>`).join('');
+  const first=new Date(_dpYear,_dpMonth,1);
+  const last=new Date(_dpYear,_dpMonth+1,0);
+  const startDay=first.getDay();
+  const totalDays=last.getDate();
+  for(let i=0;i<startDay;i++)h+='<div class="mini-dp-day empty"></div>';
+  for(let d=1;d<=totalDays;d++){
+    const ds=`${_dpYear}-${String(_dpMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const hasData=!!calDaily[ds];
+    const sel=ds===_shareDate;
+    h+=`<div class="mini-dp-day${sel?' sel':''}${hasData?' has-data':''}" onclick="pickMiniDpDate('${ds}')">${d}</div>`;
+  }
+  $('#miniDpGrid').innerHTML=h;
+}
+function pickMiniDpDate(ds){
+  _shareDate=ds;
+  $('#miniDpBtn').textContent='📅 '+ds;
+  $('#miniDpPanel').classList.remove('open');
+  renderShareCard();
+}
+document.addEventListener('click',(e)=>{
+  const dp=$('#shareDatePicker');
+  if(dp&&!dp.contains(e.target))$('#miniDpPanel').classList.remove('open');
+});
+
+function toggleShareUsd(){
+  _shareShowUsd=!_shareShowUsd;
+  $('#shareUsdToggle').classList.toggle('on',_shareShowUsd);
+  renderShareCard();
+}
+
+function renderShareCard(){
+  const s=getShareStats();
+  if(!s)return;
+  const win=s.pnlSol>=0;
+  const pnlLabel=(win?'+':'')+s.pnlSol.toFixed(6)+' SOL';
+  const subParts=[];
+  if(_shareShowUsd)subParts.push(usd(s.pnlUsd));
+  if(s.trades!=null)subParts.push(s.trades+' trades');
+  $('#scPeriod').textContent=s.periodLabel;
+  const pnlEl=$('#scPnl');
+  pnlEl.textContent=pnlLabel;
+  pnlEl.style.color=win?'#00e676':'#ff5252';
+  $('#scPnlSub').textContent=subParts.join(' · ')||' ';
+  $('#scWinRate').textContent=s.winRate!=null?s.winRate+'%':'—';
+  $('#scTrades').textContent=s.trades??'—';
+  $('#scDaysBox').style.display=s.extra?'':'none';
+  if(s.extra)$('#scDays').textContent=s.extra;
+  const taglines=win?SHARE_TAGLINES_WIN:SHARE_TAGLINES_LOSS;
+  $('#scFt').textContent=taglines[Math.floor(Math.random()*taglines.length)];
+
+  return html2canvas(document.getElementById('shareCard'),{backgroundColor:'#0d0d0d',scale:2}).then(canvas=>{
+    return new Promise(resolve=>{
+      canvas.toBlob(blob=>{
+        if(!blob){resolve();return;}
+        _shareBlob=blob;
+        _shareFname='meridian-pnl-'+_sharePeriod+'-'+(_sharePeriod==='daily'?_shareDate:utcToday())+'.png';
+        $('#sharePreviewImg').src=URL.createObjectURL(blob);
+        $('#shareCopyStatus').textContent='';
+        resolve();
+      },'image/png');
+    });
+  });
+}
+
+function shareCalendarImage(){
+  if(!_lastCalStats){alert('No calendar data loaded yet');return;}
+  if(typeof html2canvas==='undefined'){alert('Share image library failed to load — check your connection');return;}
+  _sharePeriod='monthly';
+  _shareDate=calSelDate||utcToday();
+  $('#miniDpBtn').textContent='📅 '+_shareDate;
+  $('#shareDatePicker').style.display='none';
+  $('#miniDpPanel').classList.remove('open');
+  $$('#shareModal [data-period]').forEach(el=>el.classList.toggle('on',el.dataset.period==='monthly'));
+  const btn=$('#calShare');
+  const origText=btn.textContent;
+  btn.textContent='Rendering…';
+  renderShareCard().then(()=>{
+    btn.textContent=origText;
+    $('#shareModal').classList.add('open');
+  }).catch(e=>{btn.textContent=origText;alert('Failed to generate share image: '+e.message);});
+}
+function downloadShareImage(){
+  if(!_shareBlob)return;
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(_shareBlob);
+  a.download=_shareFname||'meridian-pnl.png';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+async function copyShareImage(){
+  if(!_shareBlob)return;
+  const status=$('#shareCopyStatus');
+  try{
+    if(!window.isSecureContext)throw new Error('Clipboard image copy needs HTTPS (or localhost) — this page is loaded over plain HTTP');
+    if(!navigator.clipboard||!window.ClipboardItem)throw new Error('Clipboard image copy not supported in this browser');
+    await navigator.clipboard.write([new ClipboardItem({'image/png':_shareBlob})]);
+    status.textContent='✓ Copied to clipboard';
+    status.style.color='var(--grn)';
+  }catch(e){
+    status.textContent='Copy failed ('+e.message+') — use Download instead';
+    status.style.color='var(--red)';
+  }
 }
 function renderCalPositions(){
   const el=$('#calPositions');
@@ -1157,6 +1496,51 @@ function renderCalPositions(){
 }
 document.getElementById('calPrev').addEventListener('click',()=>{calMonth--;if(calMonth<0){calMonth=11;calYear--;}renderCalendar();});
 document.getElementById('calNext').addEventListener('click',()=>{calMonth++;if(calMonth>11){calMonth=0;calYear++;}renderCalendar();});
+
+// ═══ POOLS (aggregated per-pool history) ═══
+let poolsPgCur=1;
+async function loadPools(page=1){
+  poolsPgCur=page;
+  const d=await fj('/api/pools?page='+page+'&page_size=20');if(!d)return;
+  const pools=d.pools||[];
+  $('#poolsCount').textContent=(d.total||0)+' pools';
+  if(!pools.length){$('#poolsTbl').innerHTML='<div style="padding:24px;text-align:center;color:var(--t4);font-family:var(--mono);font-size:11px">No closed trades yet</div>';$('#poolsPg').innerHTML='';return;}
+  let h='<table><thead><tr><th>Pool</th><th style="text-align:center">Trades</th><th style="text-align:center">Win Rate</th><th>Fees (SOL)</th><th>PnL (SOL)</th><th>PnL (USD)</th><th>Last Closed</th></tr></thead><tbody>';
+  for(const p of pools){
+    const wr=p.win_rate||0;
+    const wrColor=wr>=60?'var(--grn)':wr>=40?'var(--orange)':'var(--red)';
+    h+=`<tr>
+      <td class="pn">${p.pool?`<a href="https://app.meteora.ag/dlmm/${p.pool}" target="_blank" style="color:var(--tx);text-decoration:none">${p.pool_name}</a>`:p.pool_name}</td>
+      <td style="text-align:center">${p.trades}</td>
+      <td style="text-align:center;color:${wrColor};font-weight:600">${f(wr,0)}%</td>
+      <td style="color:var(--cyan)">${f(p.total_fees_sol,6)}</td>
+      <td><span class="chip ${cc(p.total_pnl_sol)}">${p.total_pnl_sol>=0?'+':''}${f(p.total_pnl_sol,6)} SOL</span></td>
+      <td style="color:var(--t4)">${usd(p.total_pnl_usd)}</td>
+      <td style="color:var(--t4)">${p.last_closed_at?ago(p.last_closed_at):'—'}</td>
+    </tr>`;
+  }
+  h+='</tbody></table>';
+  $('#poolsTbl').innerHTML=h;
+  const pages=d.pages||1,total=d.total||0,ss=(page-1)*20+1,ee=Math.min(page*20,total);
+  let pg=`<div style="font-size:11px">${ss}–${ee} of ${total}</div><div class="pg-b">`;
+  pg+=`<button onclick="loadPools(1)" ${page===1?'disabled':''}>«</button><button onclick="loadPools(${page-1})" ${page===1?'disabled':''}>‹</button>`;
+  for(let i=1;i<=pages;i++){if(pages>7&&i>2&&i<pages-1&&Math.abs(i-page)>1){if(i===3||i===pages-2)pg+='<button disabled>…</button>';continue;}pg+=`<button class="${i===page?'on':''}" onclick="loadPools(${i})">${i}</button>`;}
+  pg+=`<button onclick="loadPools(${page+1})" ${page===pages?'disabled':''}>›</button><button onclick="loadPools(${pages})" ${page===pages?'disabled':''}>»</button></div>`;
+  $('#poolsPg').innerHTML=pg;
+}
+
+// ═══ LOGS ═══
+let logsIntervalStarted=false;
+async function loadLogs(){
+  const d=await fj('/api/logs');if(!d)return;
+  const logs=d.logs||[];
+  $('#logsMeta').textContent=logs.length+' entries · last '+(d.window_hours||6)+'h · updated '+ago(d.fetched_at);
+  if(!logs.length){$('#logsList').innerHTML='<div class="log-empty">No errors or warnings in the last '+(d.window_hours||6)+' hours</div>';}
+  else{
+    $('#logsList').innerHTML=logs.map(l=>`<div class="log-item"><span class="log-lvl ${l.level}">${l.level}</span><span class="log-ts">${l.ts?l.ts.replace('T',' ').slice(0,19):'—'}</span><span class="log-text">${(l.text||'').replace(/</g,'&lt;')}</span></div>`).join('');
+  }
+  if(!logsIntervalStarted){logsIntervalStarted=true;setInterval(loadLogs,600000);}
+}
 
 // ═══ POOL CANDIDATES (recent decisions from decision-log) ═══
 function fmtK(n){if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1e3)return(n/1e3).toFixed(1)+'K';return n.toFixed(0);}
@@ -1360,17 +1744,64 @@ function renderTbl(){
   const s=(pgCur-1)*pgSz,e=Math.min(s+pgSz,allH.length);
   const page=allH.slice(s,e);
   let h='<table><thead><tr><th>Pool</th><th>Size</th><th>PnL (SOL)</th><th>%</th><th>Fees (SOL)</th><th>PnL (USD)</th><th>Hold</th><th>Date</th></tr></thead><tbody>';
-  for(const t of page){
+  for(let i=s;i<e;i++){
+    const t=allH[i];
     const dt=t.recorded_at?utcDateShort(t.recorded_at):'—';
     const p=t.pnl_usd||0;
     const pnlSol=t.pnl_sol||0;
     const pctSol=t.pnl_sol_pct!=null?t.pnl_sol_pct:(t.pnl_pct||0);
     const feesSol=t.fees_sol||0;
-    h+=`<tr><td class="pn">${t.pool_name||'—'}</td><td>${f(t.amount_sol,2)} SOL</td><td><span class="chip ${cc(pnlSol)}">${pnlSol>=0?'+':''}${pnlSol.toFixed(6)} SOL</span></td><td style="color:${pctSol>=0?'var(--grn)':'var(--red)'};font-weight:600">${pctSol>=0?'+':''}${f(pctSol)}%</td><td style="color:var(--cyan)">${f(feesSol,4)}</td><td style="color:var(--t4)">${usd(p)}</td><td>${tm(t.minutes_held)}</td><td style="color:var(--t4)">${dt}</td></tr>`;
+    h+=`<tr class="cand-row" onclick="showHistoryModal(${i})"><td class="pn">${t.pool_name||'—'}</td><td>${f(t.amount_sol,2)} SOL</td><td><span class="chip ${cc(pnlSol)}">${pnlSol>=0?'+':''}${pnlSol.toFixed(6)} SOL</span></td><td style="color:${pctSol>=0?'var(--grn)':'var(--red)'};font-weight:600">${pctSol>=0?'+':''}${f(pctSol)}%</td><td style="color:var(--cyan)">${f(feesSol,4)}</td><td style="color:var(--t4)">${usd(p)}</td><td>${tm(t.minutes_held)}</td><td style="color:var(--t4)">${dt}</td></tr>`;
   }
   h+='</tbody></table>';
   $('#hTbl').innerHTML=h;
   renderPg();
+}
+function showHistoryModal(idx){
+  const t=allH[idx];if(!t)return;
+  const row=(k,v,cls)=>`<div class="modal-row${cls?' '+cls:''}"><span class="mk">${k}</span><span class="mv">${v}</span></div>`;
+  const delta=(a,b)=>{a=a||0;b=b||0;if(!a)return'';const pct=(b-a)/a*100;return ` <span style="color:var(--${pct>=0?'grn':'red'});font-size:10px">${pct>=0?'+':''}${pct.toFixed(0)}%</span>`;};
+  const pnlSol=t.pnl_sol||0,pnlUsd=t.pnl_usd||0;
+  const feesSol=t.fees_sol||0,feesUsd=(t.fee_pnl_usd!=null?t.fee_pnl_usd:t.fees_earned_usd)||0;
+  const ss=t.signal_snapshot||{};
+  const win=pnlSol>=0;
+  let h='';
+
+  h+=`<div class="modal-hero ${win?'grn':'red'}">`;
+  h+=`<div class="modal-hero-top"><span class="modal-hero-pool">${t.pool_name||'—'}${t.pool?` <a href="https://app.meteora.ag/dlmm/${t.pool}" target="_blank" style="color:var(--blue);font-size:11px;text-decoration:none">↗</a>`:''}</span><span class="modal-hero-pnl ${win?'grn':'red'}" style="color:var(--${win?'grn':'red'})">${pnlSol>=0?'+':''}${pnlSol.toFixed(6)} SOL</span></div>`;
+  h+=`<div class="modal-hero-sub">${usd(pnlUsd)} · ${(t.pnl_sol_pct!=null?t.pnl_sol_pct:t.pnl_pct)>=0?'+':''}${f(t.pnl_sol_pct!=null?t.pnl_sol_pct:t.pnl_pct)}% · ${tm(t.minutes_held)} held</div>`;
+  h+=`</div>`;
+
+  h+=`<div class="modal-section"><div class="modal-section-label">Position</div>`;
+  h+=row('Strategy',`${t.strategy||'—'} · bin step ${t.bin_step||'—'}`);
+  const br=t.bin_range||{};
+  h+=row('Bin Range',`${br.bins_below??'—'}d / ${br.bins_above??'—'}a (${br.min??'—'} → ${br.max??'—'})`);
+  h+=row('Size',`${f(t.amount_sol,2)} SOL`);
+  h+=row('Fees Earned',`${f(feesSol,6)} SOL <span style="color:var(--t4);font-size:10px">$${f(feesUsd,4)}</span>`,'mv-cyan');
+  h+=row('Range Efficiency',t.range_efficiency!=null?f(t.range_efficiency,0)+'%':'—');
+  h+='</div><div class="modal-sep"></div>';
+
+  h+=`<div class="modal-section"><div class="modal-section-label">Close Reason</div>`;
+  h+=`<div style="font-size:11px;color:var(--tx);line-height:1.5;padding:2px 0">${t.close_reason||'—'}</div>`;
+  h+='</div><div class="modal-sep"></div>';
+
+  h+=`<div class="modal-section"><div class="modal-section-label">Entry vs Exit</div>`;
+  h+=row('Mcap',`$${fmtK(t.entry_mcap||0)} → $${fmtK(t.exit_mcap||0)}${delta(t.entry_mcap,t.exit_mcap)}`);
+  h+=row('TVL',`$${fmtK(t.entry_tvl||0)} → $${fmtK(t.exit_tvl||0)}${delta(t.entry_tvl,t.exit_tvl)}`);
+  h+=row('Volume',`$${fmtK(t.entry_volume||0)} → $${fmtK(t.exit_volume||0)}${delta(t.entry_volume,t.exit_volume)}`);
+  h+='</div><div class="modal-sep"></div>';
+
+  h+=`<div class="modal-section"><div class="modal-section-label">Signals</div>`;
+  h+=row('Organic Score',t.organic_score??'—');
+  h+=row('Volatility',t.volatility??'—');
+  h+=row('Fee/TVL Ratio',t.fee_tvl_ratio!=null?f(t.fee_tvl_ratio*100,2)+'%':'—');
+  if(ss.bot_holders_pct!=null)h+=row('Bot Holders',f(ss.bot_holders_pct,1)+'%');
+  if(ss.top_holders_pct!=null)h+=row('Top 10 Holders',f(ss.top_holders_pct,1)+'%');
+  h+='</div><div class="modal-sep"></div>';
+
+  h+=row('Recorded At',t.recorded_at?utcDate(t.recorded_at):'—');
+  $('#historyModalBody').innerHTML=h;
+  $('#historyModal').classList.add('open');
 }
 function renderPg(){
   const total=allH.length,pages=Math.ceil(total/pgSz),s=(pgCur-1)*pgSz+1,e=Math.min(pgCur*pgSz,total);
@@ -1391,11 +1822,13 @@ setInterval(fetchLivePositions,30000);
 const mobPages=[
   {id:'overview',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>'},
   {id:'positions',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>'},
+  {id:'pools',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>'},
   {id:'candidates',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>'},
   {id:'activity',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>'},
   {id:'history',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>'},
   {id:'calendar',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>'},
   {id:'learning',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>'},
+  {id:'logs',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="6" y1="9" x2="10" y2="9"/><line x1="6" y1="13" x2="14" y2="13"/></svg>'},
   {id:'config',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>'}
 ];
 const mobNav=document.createElement('div');
@@ -1416,10 +1849,12 @@ mobNav.querySelectorAll('.mob-nav-i').forEach(el=>{
     $$('.page').forEach(p=>p.classList.remove('active'));
     document.getElementById('pg-'+pg).classList.add('active');
     curPage=pg;
+    if(pg==='pools')loadPools();
     if(pg==='candidates')loadPoolCandidates();
     if(pg==='activity')loadCandidates();
     if(pg==='learning')loadLearning();
     if(pg==='calendar')loadCalendar();
+    if(pg==='logs')loadLogs();
     window.scrollTo(0,0);
   });
 });
@@ -1428,6 +1863,50 @@ mobNav.querySelectorAll('.mob-nav-i').forEach(el=>{
   <div class="modal-box">
     <h3>Portfolio Breakdown <span class="modal-close" onclick="document.getElementById('portfolioModal').classList.remove('open')">✕</span></h3>
     <div id="portfolioModalBody"></div>
+  </div>
+</div>
+<div class="modal-overlay" id="historyModal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal-box" style="max-width:560px">
+    <h3>Trade Detail <span class="modal-close" onclick="document.getElementById('historyModal').classList.remove('open')">✕</span></h3>
+    <div id="historyModalBody"></div>
+  </div>
+</div>
+<div class="modal-overlay" id="shareModal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal-box" style="max-width:680px;width:94vw">
+    <h3>Share PnL <span class="modal-close" onclick="document.getElementById('shareModal').classList.remove('open')">✕</span></h3>
+    <div class="term-pills" style="margin-bottom:10px;flex-wrap:wrap">
+      <div class="term-pill" data-period="daily" onclick="setSharePeriod('daily')">Daily</div>
+      <div class="term-pill" data-period="weekly" onclick="setSharePeriod('weekly')">Weekly</div>
+      <div class="term-pill on" data-period="monthly" onclick="setSharePeriod('monthly')">Monthly</div>
+      <div class="mini-dp" id="shareDatePicker" style="display:none">
+        <div class="mini-dp-btn" onclick="toggleMiniDp(event)" id="miniDpBtn">📅 —</div>
+        <div class="mini-dp-panel" id="miniDpPanel">
+          <div class="mini-dp-head"><span class="mini-dp-nav" onclick="miniDpNav(-1)">‹</span><span id="miniDpLabel">—</span><span class="mini-dp-nav" onclick="miniDpNav(1)">›</span></div>
+          <div class="mini-dp-grid" id="miniDpGrid"></div>
+        </div>
+      </div>
+      <div class="term-pill on" id="shareUsdToggle" onclick="toggleShareUsd()" style="margin-left:auto">$ Show USD</div>
+    </div>
+    <img id="sharePreviewImg" src="" style="width:100%;border-radius:6px;border:1px solid var(--border);display:block;margin-bottom:10px">
+    <div style="display:flex;gap:8px">
+      <div class="pos-btn" style="flex:1" onclick="copyShareImage()">📋 Copy Image</div>
+      <div class="pos-btn" style="flex:1" onclick="downloadShareImage()">⬇ Download</div>
+    </div>
+    <div id="shareCopyStatus" style="font-family:var(--mono);font-size:10px;margin-top:8px;text-align:center;min-height:14px"></div>
+  </div>
+</div>
+<div id="shareCardWrap" style="position:fixed;left:-9999px;top:0">
+  <div class="share-card" id="shareCard">
+    <div class="sc-brand"><span class="sc-dot"></span><b>Meridian</b><span>Solana DLMM Agent</span></div>
+    <div class="sc-period" id="scPeriod">—</div>
+    <div class="sc-pnl" id="scPnl">—</div>
+    <div class="sc-pnl-sub" id="scPnlSub">—</div>
+    <div class="sc-stats">
+      <div><div class="sc-stat-l">Win Rate</div><div class="sc-stat-v" id="scWinRate">—</div></div>
+      <div><div class="sc-stat-l">Trades</div><div class="sc-stat-v" id="scTrades">—</div></div>
+      <div id="scDaysBox"><div class="sc-stat-l">Active Days</div><div class="sc-stat-v" id="scDays">—</div></div>
+    </div>
+    <div class="sc-ft" id="scFt">meridian dashboard</div>
   </div>
 </div>
 </body>
