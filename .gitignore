@@ -5,3 +5,4 @@ __pycache__/
 dashboard-config.json
 deposits.json
 *.bak
+_backups/

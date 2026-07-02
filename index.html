@@ -858,7 +858,7 @@ function renderChart(daily){
   const yFmt=showUsd&&!showSol?v=>'$'+v.toFixed(2):showSol&&!showUsd?v=>v.toFixed(4)+' SOL':v=>v.toFixed(2);
   const o={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:datasets.length>1,labels:{color:'#999',font:{family:'JetBrains Mono',size:10},boxWidth:12,padding:8}},tooltip:{backgroundColor:'#1a1a1a',titleFont:{family:'JetBrains Mono',weight:'600',size:11},bodyFont:{family:'JetBrains Mono',size:11},padding:8,borderColor:'#333',borderWidth:1,displayColors:true}},scales:{x:{grid:{color:gc,drawBorder:false},ticks:{color:tc,font:{family:'JetBrains Mono',size:10}}},y:{grid:{color:gc,drawBorder:false},ticks:{color:tc,font:{family:'JetBrains Mono',size:10},callback:yFmt}}}};
   if(showUsd&&showSol) o.scales.y1={position:'right',grid:{drawOnChartArea:false},ticks:{color:lineColorSol,font:{family:'JetBrains Mono',size:10},callback:v=>v.toFixed(4)+' SOL'}};
-  $('#chTag').textContent=daily[daily.length-1]?.trades+' trades';
+  $('#chTag').textContent=daily.reduce((a,b)=>a+(b.trades||0),0)+' trades';
   if(charts.perf)charts.perf.destroy();
   charts.perf=new Chart($('#perfChart'),{type:'line',data:{labels:lb,datasets},options:o});
 }
