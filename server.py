@@ -1199,15 +1199,35 @@ async def learning(paper: bool = Query(False)):
     }
 
 @app.get("/api/export/csv")
-async def export_csv(paper: bool = Query(False)):
+async def export_csv(
+    paper: bool = Query(False),
+    from_: str = Query(None, alias="from"),
+    to: str = Query(None),
+):
     """Full closed-trade export for offline analysis — every field on the record,
     including signal_snapshot.* and bin_range.* flattened. Not capped at 50 like
-    /api/dashboard's `history` — this is the complete performance history."""
+    /api/dashboard's `history` — this is the complete performance history.
+
+    `from`/`to` are inclusive YYYY-MM-DD dates (UTC, matching recorded_at's ISO
+    prefix) filtering on the position's close date. Omit both for the full history."""
     import csv, io
 
     lessons = load("lessons.json", paper=paper)
     perf = lessons.get("performance", []) if isinstance(lessons, dict) else []
     rows = [p for p in perf if isinstance(p, dict)]
+
+    if from_ or to:
+        def in_range(p):
+            ts = p.get("recorded_at") or ""
+            date = ts[:10]
+            if not date:
+                return False
+            if from_ and date < from_:
+                return False
+            if to and date > to:
+                return False
+            return True
+        rows = [p for p in rows if in_range(p)]
 
     CORE_COLS = [
         "position", "pool", "pool_name", "base_mint", "strategy",
@@ -1253,7 +1273,13 @@ async def export_csv(paper: bool = Query(False)):
     for r in flat_rows:
         writer.writerow(r)
 
-    fname = f"meridian-trades-{datetime.now(timezone.utc).strftime('%Y%m%d')}.csv"
+    if from_ and to and from_ == to:
+        suffix = from_
+    elif from_ or to:
+        suffix = f"{from_ or 'start'}_to_{to or 'now'}"
+    else:
+        suffix = datetime.now(timezone.utc).strftime("%Y%m%d")
+    fname = f"meridian-trades-{suffix}.csv"
     return Response(
         content=buf.getvalue(),
         media_type="text/csv",

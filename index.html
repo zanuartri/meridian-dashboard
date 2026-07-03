@@ -83,6 +83,11 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
 .modal-row.mv-red .mv{color:var(--red)}
 .modal-row.mv-cyan .mv{color:var(--cyan)}
 .modal-sep{border-top:1px solid var(--border);margin:6px 0}
+.exp-label{display:block;color:var(--t3);font-size:10px;margin-bottom:4px}
+.exp-input{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:3px;color:var(--tx);font-family:var(--mono);font-size:11px;padding:6px 8px;box-sizing:border-box;color-scheme:dark}
+.exp-input:focus{outline:none;border-color:var(--border2)}
+.exp-row{display:flex;gap:8px}
+.exp-row>div{flex:1}
 .modal-hero{margin:0 0 12px;padding:12px 14px;border-radius:var(--r);border:1px solid var(--border)}
 .modal-hero.grn{background:var(--grn-bg);border-color:rgba(0,230,118,.25)}.modal-hero.red{background:var(--red-bg);border-color:rgba(255,82,82,.25)}
 .modal-hero-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
@@ -605,7 +610,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);-webkit-font-s
         <div class="term-title"><div class="term-dot"></div><h2>Trade History</h2></div>
         <div style="display:flex;align-items:center;gap:10px">
           <span style="font-family:var(--mono);font-size:10px;color:var(--t4)" id="hCount">—</span>
-          <a class="pos-btn" href="/api/export/csv" download style="text-decoration:none">⬇ Export CSV</a>
+          <div class="pos-btn" onclick="openExportModal()" style="text-decoration:none">⬇ Export CSV</div>
         </div>
       </div>
       <div class="tbl-box">
@@ -801,7 +806,10 @@ function applyLivePositions(){
         p.unclaimed_fees_usd=parseFloat(pool.unclaimedFees)||0;
         p.unclaimed_fees_sol=parseFloat(pool.unclaimedFeesSol)||0;
         p.total_value_usd=(parseFloat(pool.balances)||0)+(parseFloat(pool.unclaimedFees)||0);
-        p.out_of_range_since=pool.outOfRange?new Date().toISOString():null;
+        // Preserve the original OOR-start timestamp across polls — only set it on
+        // first detection (transition into OOR), never overwrite an existing one, else
+        // OOR Duration keeps resetting to ~0 (renders as "-") every 30s poll.
+        p.out_of_range_since=pool.outOfRange?(p.out_of_range_since||new Date().toISOString()):null;
       }
     }
   }
@@ -1813,6 +1821,50 @@ function renderPg(){
 }
 function goPg(n){pgCur=Math.max(1,Math.min(n,Math.ceil(allH.length/pgSz)));renderTbl();}
 
+// ═══ EXPORT CSV MODAL ═══
+let _expRange='all';
+function openExportModal(){
+  $('#exportStatus').textContent='';
+  $('#exportModal').classList.add('open');
+}
+function setExportRange(r){
+  _expRange=r;
+  $$('#exportModal [data-erange]').forEach(el=>el.classList.toggle('on',el.dataset.erange===r));
+  $('#exportSingleDateField').style.display=r==='date'?'':'none';
+  $('#exportRangeFields').style.display=r==='range'?'flex':'none';
+  const today=utcNow().toISOString().slice(0,10);
+  if(r==='date'&&!$('#exportDate').value)$('#exportDate').value=today;
+  if(r==='range'){
+    if(!$('#exportFrom').value)$('#exportFrom').value=today;
+    if(!$('#exportTo').value)$('#exportTo').value=today;
+  }
+  $('#exportStatus').textContent='';
+}
+function doExportCsv(){
+  const now=utcNow();
+  let from='',to='';
+  if(_expRange==='week'){
+    const day=now.getUTCDay(),diffToMonday=(day===0?6:day-1);
+    from=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate()-diffToMonday)).toISOString().slice(0,10);
+    to=now.toISOString().slice(0,10);
+  }else if(_expRange==='month'){
+    from=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),1)).toISOString().slice(0,10);
+    to=now.toISOString().slice(0,10);
+  }else if(_expRange==='date'){
+    from=to=$('#exportDate').value;
+    if(!from){$('#exportStatus').textContent='Pick a date first';return;}
+  }else if(_expRange==='range'){
+    from=$('#exportFrom').value;to=$('#exportTo').value;
+    if(!from||!to){$('#exportStatus').textContent='Pick both dates';return;}
+    if(from>to){$('#exportStatus').textContent='"From" must be before "To"';return;}
+  }
+  const params=new URLSearchParams();
+  if(from)params.set('from',from);
+  if(to)params.set('to',to);
+  window.location.href='/api/export/csv'+(params.toString()?'?'+params.toString():'');
+  $('#exportModal').classList.remove('open');
+}
+
 fetchBoth();
 setInterval(fetchBoth,60000);
 fetchLivePositions();
@@ -1869,6 +1921,34 @@ mobNav.querySelectorAll('.mob-nav-i').forEach(el=>{
   <div class="modal-box" style="max-width:560px">
     <h3>Trade Detail <span class="modal-close" onclick="document.getElementById('historyModal').classList.remove('open')">✕</span></h3>
     <div id="historyModalBody"></div>
+  </div>
+</div>
+<div class="modal-overlay" id="exportModal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal-box" style="max-width:420px">
+    <h3>Export CSV <span class="modal-close" onclick="document.getElementById('exportModal').classList.remove('open')">✕</span></h3>
+    <div class="term-pills" style="flex-wrap:wrap;margin-bottom:12px">
+      <div class="term-pill on" data-erange="all" onclick="setExportRange('all')">All</div>
+      <div class="term-pill" data-erange="week" onclick="setExportRange('week')">This Week</div>
+      <div class="term-pill" data-erange="month" onclick="setExportRange('month')">This Month</div>
+      <div class="term-pill" data-erange="date" onclick="setExportRange('date')">Specific Date</div>
+      <div class="term-pill" data-erange="range" onclick="setExportRange('range')">Date Range</div>
+    </div>
+    <div id="exportSingleDateField" style="display:none;margin-bottom:14px">
+      <label class="exp-label">Date</label>
+      <input type="date" id="exportDate" class="exp-input">
+    </div>
+    <div id="exportRangeFields" class="exp-row" style="display:none;margin-bottom:14px">
+      <div>
+        <label class="exp-label">From</label>
+        <input type="date" id="exportFrom" class="exp-input">
+      </div>
+      <div>
+        <label class="exp-label">To</label>
+        <input type="date" id="exportTo" class="exp-input">
+      </div>
+    </div>
+    <div class="pos-btn" style="width:100%;box-sizing:border-box;text-align:center" onclick="doExportCsv()">⬇ Export</div>
+    <div id="exportStatus" style="font-family:var(--mono);font-size:10px;margin-top:8px;text-align:center;min-height:14px;color:var(--red)"></div>
   </div>
 </div>
 <div class="modal-overlay" id="shareModal" onclick="if(event.target===this)this.classList.remove('open')">
