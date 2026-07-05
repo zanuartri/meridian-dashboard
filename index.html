@@ -875,13 +875,15 @@ function renderStats(d){
   const portColor=portfolioSol!=null?(portfolioSol>=0?'grn':'red'):'t3';
 
   const netDeposited = (d.deposit_stats?.total_usd||0) - (d.deposit_stats?.withdrawn_usd||0);
+  const netDepositedSol = (d.deposit_stats?.total_sol||0) - (d.deposit_stats?.withdrawn_sol||0);
+  const pnlSolPct = netDepositedSol>0 ? (pnlSol/netDepositedSol*100) : null;
   const portfolioCard = portfolioUsd!=null
     ? `<div class="stat"><div class="stat-l">Portfolio<span class="stat-info" onclick="showPortfolioModal()" title="Portfolio breakdown">i</span></div><div class="stat-v ${portColor}">${portfolioUsd>=0?'+':'-'}$${f(Math.abs(portfolioUsd))}</div><div class="stat-sub">$${f(portfolioTotal)} now / $${f(netDeposited)} net</div></div>`
     : '';
   let statsHtml=`
     <div class="stat"><div class="stat-l">Open</div><div class="stat-v blue">${d.position_count}/${d.max_positions}</div><div class="stat-sub">positions</div></div>
     <div class="stat"><div class="stat-l">Unrealized</div><div class="stat-v ${unrColor}">${sol(unrealizedSol)}</div><div class="stat-sub" style="color:var(--${unrealized>=0?'grn':'red'})">${usd(unrealized)}</div></div>
-    <div class="stat"><div class="stat-l">Net PnL</div><div class="stat-v ${pnlColor}">${sol(pnlSol)}</div><div class="stat-sub" style="color:var(--${pnl>=0?'grn':'red'})">${usd(pnl)}</div></div>
+    <div class="stat"><div class="stat-l">Net PnL</div><div class="stat-v ${pnlColor}">${sol(pnlSol)} <span style="font-size:10px;opacity:.7">${pnlSolPct!=null?(pnlSolPct>=0?'+':'')+f(pnlSolPct)+'%':''}</span></div><div class="stat-sub" style="color:var(--${pnl>=0?'grn':'red'})">${usd(pnl)}</div></div>
     ${portfolioCard}
   `;
   $('#statRow').innerHTML=statsHtml;
@@ -931,6 +933,9 @@ function showPortfolioModal(){
   h+=`<div class="modal-row"><span class="mk">Deposited</span><span class="mv">${c.deposited_sol.toFixed(4)} SOL <span style="color:var(--t4);font-size:10px">($${f(c.deposited_usd)} @ $${f(c.avg_deposit_price)}/SOL)</span></span></div>`;
   if(c.withdrawn_sol>0){
     h+=`<div class="modal-row"><span class="mk">Withdrawn</span><span class="mv">${c.withdrawn_sol.toFixed(4)} SOL <span style="color:var(--t4);font-size:10px">($${f(c.withdrawn_usd)})</span></span></div>`;
+    const netDepSol=c.deposited_sol-(c.withdrawn_sol||0);
+    const netDepUsd=c.deposited_usd-(c.withdrawn_usd||0);
+    h+=`<div class="modal-row"><span class="mk">Net Deposited</span><span class="mv" style="font-weight:600">${netDepSol.toFixed(4)} SOL <span style="color:var(--t4);font-size:10px">($${f(netDepUsd)})</span></span></div>`;
   }
   h+=`<div class="modal-row"><span class="mk">SOL Price</span><span class="mv">$${f(c.sol_price)}</span></div>`;
   h+=`</div>`;
