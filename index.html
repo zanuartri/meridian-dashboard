@@ -927,10 +927,13 @@ function showPortfolioModal(){
 
   h+=`<div class="modal-sep"></div>`;
   h+=`<div class="modal-row" style="padding:2px 0"><span class="mk" style="font-weight:600;color:var(--tx)">Total</span><span class="mv" style="color:var(--tx);font-size:12px">${c.current_sol.toFixed(4)} SOL <span style="color:var(--t4);font-size:10px">($${f(c.current_usd)})</span></span></div>`;
-  if(c.daily_diff){
-    const dd=c.daily_diff;
-    const ddColor=dd.diff_sol>=0?'grn':'red';
-    h+=`<div class="modal-row"><span class="mk" style="color:var(--t3);font-size:10px">vs kemarin (${dd.date}, cutoff 07:00 WIB)</span><span class="mv" style="color:var(--${ddColor});font-size:11px">${dd.diff_sol>=0?'+':''}${dd.diff_sol.toFixed(4)} SOL <span style="color:var(--t4);font-size:10px">(${dd.sol.toFixed(4)} → ${c.current_sol.toFixed(4)})</span></span></div>`;
+  const hist=c.daily_sol_history||[];
+  if(hist.length>=2){
+    const last=hist[hist.length-1],prev=hist[hist.length-2];
+    const diffSol=last.sol-prev.sol;
+    const ddColor=diffSol>=0?'grn':'red';
+    h+=`<div class="modal-row"><span class="mk" style="color:var(--t3);font-size:10px">vs kemarin (${prev.date}, cutoff 07:00 WIB)</span><span class="mv" style="color:var(--${ddColor});font-size:11px">${diffSol>=0?'+':''}${diffSol.toFixed(4)} SOL</span></div>`;
+    h+=`<div class="chart-wrap" style="height:110px;margin-top:6px"><canvas id="solDailyChart"></canvas></div>`;
   }
 
   h+=`<div class="modal-sep"></div>`;
@@ -951,6 +954,18 @@ function showPortfolioModal(){
   h+=`<div class="modal-row ${pnl>=0?'mv-grn':'mv-red'}" style="padding:2px 0"><span class="mk" style="font-weight:600">Portfolio PnL</span><span class="mv" style="font-size:12px">${pnl>=0?'+':''}$${f(pnl)} <span style="font-size:10px">${pnlSol>=0?'+':''}${pnlSol.toFixed(4)} ◎</span></span></div>`;
   $('#portfolioModalBody').innerHTML=h;
   $('#portfolioModal').classList.add('open');
+  renderSolDailyChart(hist);
+}
+function renderSolDailyChart(hist){
+  if(charts.solDaily){charts.solDaily.destroy();charts.solDaily=null;}
+  const canvas=$('#solDailyChart');
+  if(!canvas||!hist||hist.length<2)return;
+  const lb=hist.map(x=>x.date.slice(5));
+  const vals=hist.map(x=>x.sol);
+  const trendUp=vals[vals.length-1]>=vals[0];
+  const lineColor=trendUp?'#00e676':'#ff5252';
+  const gc='#252525',tc='#666';
+  charts.solDaily=new Chart(canvas,{type:'line',data:{labels:lb,datasets:[{data:vals,borderColor:lineColor,backgroundColor:ctx=>{const g=ctx.chart.ctx.createLinearGradient(0,0,0,110);g.addColorStop(0,trendUp?'rgba(0,230,118,.15)':'rgba(255,82,82,.15)');g.addColorStop(1,'rgba(0,0,0,0)');return g},fill:true,tension:.25,pointRadius:2,borderWidth:1.5,pointBackgroundColor:lineColor,pointBorderColor:'#141414',pointBorderWidth:1}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#1a1a1a',titleFont:{family:'JetBrains Mono',weight:'600',size:10},bodyFont:{family:'JetBrains Mono',size:10},padding:6,borderColor:'#333',borderWidth:1,callbacks:{label:ctx=>ctx.parsed.y.toFixed(4)+' SOL'}}},scales:{x:{grid:{color:gc,drawBorder:false},ticks:{color:tc,font:{family:'JetBrains Mono',size:9}}},y:{grid:{color:gc,drawBorder:false},ticks:{color:tc,font:{family:'JetBrains Mono',size:9},callback:v=>v.toFixed(2)}}}}});
 }
 function renderChart(daily){
   // Show/hide instead of removing canvas from DOM

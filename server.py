@@ -327,26 +327,22 @@ def load_sol_daily_snapshots():
             pass
     return {}
 
-def get_sol_daily_diff(current_sol):
-    """Diff vs the most recent snapshot before today (same WIB-07:00 day boundary as pnl_today)."""
-    if current_sol is None:
-        return None
+def get_sol_daily_history(current_sol):
+    """Daily current_sol series (date-sorted) for charting, with today's point
+    live-updated to current_sol rather than whatever the 00:01 UTC cron captured."""
     snapshots = load_sol_daily_snapshots()
-    if not snapshots:
-        return None
-    today_key = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    prior_keys = sorted(k for k in snapshots if k < today_key)
-    if not prior_keys:
-        return None
-    prior_key = prior_keys[-1]
-    prior_sol = snapshots[prior_key].get("current_sol")
-    if prior_sol is None:
-        return None
-    return {
-        "date": prior_key,
-        "sol": prior_sol,
-        "diff_sol": round(current_sol - prior_sol, 6),
-    }
+    history = [
+        {"date": k, "sol": v.get("current_sol")}
+        for k, v in sorted(snapshots.items())
+        if isinstance(v, dict) and v.get("current_sol") is not None
+    ]
+    if current_sol is not None:
+        today_key = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        if history and history[-1]["date"] == today_key:
+            history[-1] = {"date": today_key, "sol": current_sol}
+        else:
+            history.append({"date": today_key, "sol": current_sol})
+    return history
 
 def fmt(n, d=2):
     if n is None or n != n: return None
@@ -815,7 +811,7 @@ async def dashboard(paper: bool = Query(False)):
                 "withdrawn_usd": withdrawn_usd,
                 "avg_deposit_price": deposit_stats.get("avg_price", 0),
                 "sol_price": sol_price_for_pnl,
-                "daily_diff": get_sol_daily_diff(round(current_sol, 4)),
+                "daily_sol_history": get_sol_daily_history(round(current_sol, 4)),
             }
 
     # Active dev-mint cooldowns + blocklist
