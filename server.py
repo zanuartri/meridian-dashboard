@@ -927,6 +927,10 @@ async def live_positions():
 @app.get("/api/config")
 async def get_config():
     config = load_dashboard_config()
+    # Never expose the auth password or the session-signing secret over the API —
+    # session_secret leaking would let anyone forge a valid session cookie even
+    # after the password is rotated.
+    config = {k: v for k, v in config.items() if k not in ("password", "session_secret")}
     config["has_helius_key"] = False  # Deprecated — using public RPC
     return config
 
