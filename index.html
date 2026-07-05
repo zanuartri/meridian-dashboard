@@ -927,6 +927,11 @@ function showPortfolioModal(){
 
   h+=`<div class="modal-sep"></div>`;
   h+=`<div class="modal-row" style="padding:2px 0"><span class="mk" style="font-weight:600;color:var(--tx)">Total</span><span class="mv" style="color:var(--tx);font-size:12px">${c.current_sol.toFixed(4)} SOL <span style="color:var(--t4);font-size:10px">($${f(c.current_usd)})</span></span></div>`;
+  if(c.daily_diff){
+    const dd=c.daily_diff;
+    const ddColor=dd.diff_sol>=0?'grn':'red';
+    h+=`<div class="modal-row"><span class="mk" style="color:var(--t3);font-size:10px">vs kemarin (${dd.date}, cutoff 07:00 WIB)</span><span class="mv" style="color:var(--${ddColor});font-size:11px">${dd.diff_sol>=0?'+':''}${dd.diff_sol.toFixed(4)} SOL <span style="color:var(--t4);font-size:10px">(${dd.sol.toFixed(4)} → ${c.current_sol.toFixed(4)})</span></span></div>`;
+  }
 
   h+=`<div class="modal-sep"></div>`;
   h+=`<div class="modal-section"><div class="modal-section-label">Deposit Tracking</div>`;

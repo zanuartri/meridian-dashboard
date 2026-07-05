@@ -314,6 +314,40 @@ def get_wallet_addr():
             w = wb.get("wallet", "")
     return w
 
+# ─── Daily SOL snapshot ──────────────────────────────────────────
+# Written by sol_daily_snapshot.py (cron, once per day at 00:01 UTC = 07:01 WIB —
+# same cutoff as pnl_today's today_start). Dashboard-only, does not touch /root/meridian.
+SOL_DAILY_SNAPSHOT_FILE = Path(__file__).parent / "sol-daily-snapshot.json"
+
+def load_sol_daily_snapshots():
+    if SOL_DAILY_SNAPSHOT_FILE.exists():
+        try:
+            return json.loads(SOL_DAILY_SNAPSHOT_FILE.read_text())
+        except Exception:
+            pass
+    return {}
+
+def get_sol_daily_diff(current_sol):
+    """Diff vs the most recent snapshot before today (same WIB-07:00 day boundary as pnl_today)."""
+    if current_sol is None:
+        return None
+    snapshots = load_sol_daily_snapshots()
+    if not snapshots:
+        return None
+    today_key = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    prior_keys = sorted(k for k in snapshots if k < today_key)
+    if not prior_keys:
+        return None
+    prior_key = prior_keys[-1]
+    prior_sol = snapshots[prior_key].get("current_sol")
+    if prior_sol is None:
+        return None
+    return {
+        "date": prior_key,
+        "sol": prior_sol,
+        "diff_sol": round(current_sol - prior_sol, 6),
+    }
+
 def fmt(n, d=2):
     if n is None or n != n: return None
     return round(float(n), d)
@@ -781,6 +815,7 @@ async def dashboard(paper: bool = Query(False)):
                 "withdrawn_usd": withdrawn_usd,
                 "avg_deposit_price": deposit_stats.get("avg_price", 0),
                 "sol_price": sol_price_for_pnl,
+                "daily_diff": get_sol_daily_diff(round(current_sol, 4)),
             }
 
     # Active dev-mint cooldowns + blocklist

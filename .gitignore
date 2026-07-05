@@ -6,3 +6,4 @@ dashboard-config.json
 deposits.json
 *.bak
 _backups/
+sol-daily-snapshot.json
