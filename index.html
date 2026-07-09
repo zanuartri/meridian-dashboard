@@ -951,7 +951,7 @@ function showPortfolioModal(){
   h+=`<div class="modal-sep"></div>`;
   const pnl=c.current_usd + (c.withdrawn_usd||0) - c.deposited_usd;
   const pnlSol=c.current_sol + (c.withdrawn_sol||0) - c.deposited_sol;
-  h+=`<div class="modal-row ${pnl>=0?'mv-grn':'mv-red'}" style="padding:2px 0"><span class="mk" style="font-weight:600">Portfolio PnL</span><span class="mv" style="font-size:12px">${pnl>=0?'+':''}$${f(pnl)} <span style="font-size:10px">${pnlSol>=0?'+':''}${pnlSol.toFixed(4)} ◎</span></span></div>`;
+  h+=`<div class="modal-row ${pnl>=0?'mv-grn':'mv-red'}" style="padding:2px 0"><span class="mk" style="font-weight:600">Portfolio PnL</span><span class="mv" style="font-size:12px">${pnl>=0?'+':''}$${f(pnl)} <span style="font-size:10px;color:var(--${pnlSol>=0?'grn':'red'})">${pnlSol>=0?'+':''}${pnlSol.toFixed(4)} ◎</span></span></div>`;
   $('#portfolioModalBody').innerHTML=h;
   $('#portfolioModal').classList.add('open');
   renderSolDailyChart(hist);
