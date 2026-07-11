@@ -806,6 +806,10 @@ function applyLivePositions(){
         p.unclaimed_fees_usd=parseFloat(pool.unclaimedFees)||0;
         p.unclaimed_fees_sol=parseFloat(pool.unclaimedFeesSol)||0;
         p.total_value_usd=(parseFloat(pool.balances)||0)+(parseFloat(pool.unclaimedFees)||0);
+        // Compute total_value_sol from USD value + live SOL price
+        if(data?.sol_price && data.sol_price>0){
+          p.total_value_sol=p.total_value_usd/data.sol_price;
+        }
         // Preserve the original OOR-start timestamp across polls — only set it on
         // first detection (transition into OOR), never overwrite an existing one, else
         // OOR Duration keeps resetting to ~0 (renders as "-") every 30s poll.
