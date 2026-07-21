@@ -169,6 +169,32 @@ def latest_wallet_balance():
     return None
 
 
+def fetch_positions_rent_sol(position_addresses):
+    """Sum the ACTUAL on-chain rent-exempt lamports locked in each open position account.
+    Wide-range positions (>69 bins) get a larger account size than the flat default
+    (3228 bytes / 0.057406 SOL) that RENT_PER_POSITION_SOL assumed — a 232-bin position
+    was observed at 26,376 bytes / ~0.1845 SOL, ~0.127 SOL (~$10) more than the flat
+    estimate credited, making portfolio total_equity look understated by that much.
+    Returns None on RPC failure so callers can fall back to the flat estimate.
+    """
+    if not position_addresses:
+        return 0.0
+    RPC_URL = "https://api.mainnet-beta.solana.com"
+    try:
+        payload = json.dumps({
+            "jsonrpc": "2.0", "id": 1, "method": "getMultipleAccounts",
+            "params": [position_addresses, {"encoding": "base64"}],
+        }).encode()
+        req = urllib.request.Request(RPC_URL, data=payload, headers={"Content-Type": "application/json"})
+        resp = urllib.request.urlopen(req, timeout=15)
+        result = json.loads(resp.read())
+        accounts = result.get("result", {}).get("value", [])
+        total_lamports = sum((a or {}).get("lamports", 0) for a in accounts)
+        return total_lamports / 1e9
+    except Exception:
+        return None
+
+
 def fetch_wallet_rpc():
     """Fetch wallet balance directly via public Solana RPC (no API key needed).
     Returns SOL balance, SOL price, and token accounts."""
@@ -438,7 +464,10 @@ async def dashboard(paper: bool = Query(False)):
     total_unrealized_sol = 0
     total_unclaimed_fees_sol = 0
     sol_price_for_pnl = get_sol_price()
-    sol_mode = config.get("management", {}).get("solMode", False)
+    # user-config.json stores solMode at the top level, not nested under "management"
+    # (that key doesn't exist) — reading the wrong path silently kept sol_mode=False,
+    # which resurrected the double-conversion bug this block was meant to fix.
+    sol_mode = config.get("management", {}).get("solMode", config.get("solMode", False))
     for addr, pos in positions.items():
         if not isinstance(pos, dict) or pos.get("closed"): continue
         br = pos.get("bin_range", {}) or {}
@@ -720,10 +749,12 @@ async def dashboard(paper: bool = Query(False)):
             val_usd = amount_sol * sol_price if sol_price else 0
         positions_value += (val_usd or 0)
     
-    # Rent: each DLMM position locks ~0.057 SOL for rent exemption (account size 3228 bytes)
-    # This is a protocol constant — no need to query on-chain per position
-    RENT_PER_POSITION_SOL = 0.057406  # getMinimumBalanceForRentExemption(3228) / 1e9
-    rent_sol_total = len(active) * RENT_PER_POSITION_SOL
+    # Rent: fetch actual on-chain rent-exempt lamports per position — wide-range positions
+    # (>69 bins) have a larger account than the old flat-default assumption, so a fixed
+    # per-position estimate undercounts locked rent (see fetch_positions_rent_sol docstring).
+    RENT_PER_POSITION_SOL = 0.057406  # fallback estimate only, used if the RPC call fails
+    actual_rent_sol = fetch_positions_rent_sol([p["address"] for p in active])
+    rent_sol_total = actual_rent_sol if actual_rent_sol is not None else len(active) * RENT_PER_POSITION_SOL
     
     rent_usd = round(rent_sol_total * sol_price, 2) if sol_price else 0
     total_equity = None
